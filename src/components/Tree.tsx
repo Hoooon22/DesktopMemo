@@ -6,12 +6,16 @@ type TreeProps = {
   selected: string;
   targetDir: string;
   collapsed: Set<string>;
+  renamingPath: string | null;
   onSelectNote: (path: string) => void;
   onSelectFolder: (dir: string) => void;
   onToggle: (path: string) => void;
-  onRename: (path: string, newName: string) => void;
+  onRename: (path: string, newName: string) => Promise<boolean>;
+  onStartRename: (path: string) => void;
+  onEndRename: () => void;
   onMove: (path: string, dir: string) => void;
   onDelete: (path: string) => void;
+  onContextMenu: (node: TreeNode, x: number, y: number) => void;
   onDragStart: (path: string) => void;
   onDragEnd: () => void;
 };
@@ -72,24 +76,29 @@ function TreeItem({
   selected,
   targetDir,
   collapsed,
+  renamingPath,
   onSelectNote,
   onSelectFolder,
   onToggle,
   onRename,
+  onStartRename,
+  onEndRename,
   onMove,
   onDelete,
+  onContextMenu,
   onDragStart,
   onDragEnd,
 }: ItemProps) {
-  const [editing, setEditing] = useState(false);
   const [dropOver, setDropOver] = useState(false);
+  const enterCount = useRef(0);
 
+  const editing = renamingPath === node.path;
   const display = node.isDir ? node.name : node.name.replace(/\.md$/i, "");
 
   const commitRename = (value: string) => {
-    setEditing(false);
+    onEndRename();
     const name = value.trim();
-    if (name && name !== display) onRename(node.path, name);
+    if (name && name !== display) void onRename(node.path, name);
   };
 
   const deleteButton = !editing && (
@@ -105,21 +114,48 @@ function TreeItem({
     </button>
   );
 
+  const dragProps = {
+    draggable: !editing,
+    onDragStart: (e: React.DragEvent) => {
+      e.dataTransfer.setData("text/plain", node.path);
+      e.dataTransfer.effectAllowed = "move";
+      onDragStart(node.path);
+    },
+    onDragEnd,
+    onContextMenu: (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onContextMenu(node, e.clientX, e.clientY);
+    },
+  };
+
   if (node.isDir) {
     const open = !collapsed.has(node.path);
     return (
       <li
         className={dropOver ? "drop-over" : undefined}
+        onDragEnter={(e) => {
+          e.stopPropagation();
+          enterCount.current++;
+          setDropOver(true);
+        }}
         onDragOver={(e) => {
           e.preventDefault();
           e.stopPropagation();
           e.dataTransfer.dropEffect = "move";
-          setDropOver(true);
         }}
-        onDragLeave={() => setDropOver(false)}
+        onDragLeave={(e) => {
+          e.stopPropagation();
+          enterCount.current--;
+          if (enterCount.current <= 0) {
+            enterCount.current = 0;
+            setDropOver(false);
+          }
+        }}
         onDrop={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          enterCount.current = 0;
           setDropOver(false);
           onMove(e.dataTransfer.getData("text/plain"), node.path);
         }}
@@ -128,17 +164,14 @@ function TreeItem({
           {editing ? (
             <div className="tree-row folder">
               <span className="chevron">{open ? "▾" : "▸"}</span>
-              <RenameInput
-                initial={display}
-                onCommit={commitRename}
-                onCancel={() => setEditing(false)}
-              />
+              <RenameInput initial={display} onCommit={commitRename} onCancel={onEndRename} />
             </div>
           ) : (
             <button
               className={"tree-row folder" + (targetDir === node.path ? " target" : "")}
               onClick={() => onSelectFolder(node.path)}
-              onDoubleClick={() => setEditing(true)}
+              onDoubleClick={() => onStartRename(node.path)}
+              {...dragProps}
             >
               <span
                 className="chevron"
@@ -161,12 +194,16 @@ function TreeItem({
               selected={selected}
               targetDir={targetDir}
               collapsed={collapsed}
+              renamingPath={renamingPath}
               onSelectNote={onSelectNote}
               onSelectFolder={onSelectFolder}
               onToggle={onToggle}
               onRename={onRename}
+              onStartRename={onStartRename}
+              onEndRename={onEndRename}
               onMove={onMove}
               onDelete={onDelete}
+              onContextMenu={onContextMenu}
               onDragStart={onDragStart}
               onDragEnd={onDragEnd}
             />
@@ -181,24 +218,14 @@ function TreeItem({
       <div className="row-wrap">
         {editing ? (
           <div className="tree-row note">
-            <RenameInput
-              initial={display}
-              onCommit={commitRename}
-              onCancel={() => setEditing(false)}
-            />
+            <RenameInput initial={display} onCommit={commitRename} onCancel={onEndRename} />
           </div>
         ) : (
           <button
             className={"tree-row note" + (selected === node.path ? " selected" : "")}
-            draggable
             onClick={() => onSelectNote(node.path)}
-            onDoubleClick={() => setEditing(true)}
-            onDragStart={(e) => {
-              e.dataTransfer.setData("text/plain", node.path);
-              e.dataTransfer.effectAllowed = "move";
-              onDragStart(node.path);
-            }}
-            onDragEnd={onDragEnd}
+            onDoubleClick={() => onStartRename(node.path)}
+            {...dragProps}
           >
             <span className="label">{display}</span>
           </button>
