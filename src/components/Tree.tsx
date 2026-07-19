@@ -15,6 +15,7 @@ type TreeProps = {
   onEndRename: () => void;
   onMove: (path: string, dir: string) => void;
   onDelete: (path: string) => void;
+  onNewNoteIn: (dir: string) => void;
   onContextMenu: (node: TreeNode, x: number, y: number) => void;
   onDragStart: (path: string) => void;
   onDragEnd: () => void;
@@ -85,6 +86,7 @@ function TreeItem({
   onEndRename,
   onMove,
   onDelete,
+  onNewNoteIn,
   onContextMenu,
   onDragStart,
   onDragEnd,
@@ -103,6 +105,18 @@ function TreeItem({
 
   const rowActions = !editing && (
     <div className="row-actions">
+      {node.isDir && (
+        <button
+          className="row-btn add"
+          title="이 폴더에 새 메모"
+          onClick={(e) => {
+            e.stopPropagation();
+            onNewNoteIn(node.path);
+          }}
+        >
+          +
+        </button>
+      )}
       <button
         className="row-btn edit"
         title="이름 바꾸기 (F2)"
@@ -209,6 +223,7 @@ function TreeItem({
               onEndRename={onEndRename}
               onMove={onMove}
               onDelete={onDelete}
+              onNewNoteIn={onNewNoteIn}
               onContextMenu={onContextMenu}
               onDragStart={onDragStart}
               onDragEnd={onDragEnd}

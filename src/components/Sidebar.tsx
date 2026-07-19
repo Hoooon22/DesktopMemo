@@ -24,6 +24,7 @@ type Props = {
   onEndRename: () => void;
   onMove: (path: string, dir: string) => void;
   onDelete: (path: string) => void;
+  onNewNoteIn: (dir: string) => void;
   onContextMenu: (node: TreeNode, x: number, y: number) => void;
   onDragStart: (path: string) => void;
   onDragEnd: () => void;
@@ -49,6 +50,7 @@ export default function Sidebar({
   onEndRename,
   onMove,
   onDelete,
+  onNewNoteIn,
   onContextMenu,
   onDragStart,
   onDragEnd,
@@ -150,6 +152,7 @@ export default function Sidebar({
             onEndRename={onEndRename}
             onMove={onMove}
             onDelete={onDelete}
+            onNewNoteIn={onNewNoteIn}
             onContextMenu={onContextMenu}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}

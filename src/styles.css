@@ -200,6 +200,10 @@ button {
   gap: 5px;
   width: 100%;
   padding: 5px 48px 5px 8px; /* 오른쪽은 ✎ ✕ 버튼 자리 */
+}
+
+.tree-row.folder {
+  padding-right: 70px; /* 폴더는 + ✎ ✕ 세 버튼 자리 */
   border-radius: 5px;
   white-space: nowrap;
 }
@@ -261,6 +265,11 @@ button {
   line-height: 1;
 }
 
+.row-btn.add {
+  font-size: 14px;
+}
+
+.row-btn.add:hover,
 .row-btn.edit:hover {
   background: var(--bg-hover);
   color: var(--accent);

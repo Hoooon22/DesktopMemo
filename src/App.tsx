@@ -261,6 +261,7 @@ export default function App() {
         onEndRename={() => setRenamingPath(null)}
         onMove={handleMove}
         onDelete={handleDelete}
+        onNewNoteIn={(dir) => void handleNewNote(dir)}
         onContextMenu={openCtxMenu}
         onDragStart={setDragging}
         onDragEnd={() => setDragging(null)}
