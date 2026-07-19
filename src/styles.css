@@ -199,7 +199,7 @@ button {
   align-items: center;
   gap: 5px;
   width: 100%;
-  padding: 5px 26px 5px 8px; /* 오른쪽은 ✕ 버튼 자리 */
+  padding: 5px 48px 5px 8px; /* 오른쪽은 ✎ ✕ 버튼 자리 */
   border-radius: 5px;
   white-space: nowrap;
 }
@@ -236,14 +236,23 @@ button {
   position: relative;
 }
 
-.row-delete {
+.row-actions {
   position: absolute;
   top: 50%;
   right: 4px;
   transform: translateY(-50%);
+  display: none;
+  gap: 2px;
+}
+
+.row-wrap:hover .row-actions {
+  display: flex;
+}
+
+.row-btn {
   width: 20px;
   height: 20px;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
@@ -252,11 +261,12 @@ button {
   line-height: 1;
 }
 
-.row-wrap:hover .row-delete {
-  display: flex;
+.row-btn.edit:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
 }
 
-.row-delete:hover {
+.row-btn.delete:hover {
   background: var(--bg-hover);
   color: var(--danger);
 }

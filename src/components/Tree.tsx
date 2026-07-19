@@ -101,17 +101,29 @@ function TreeItem({
     if (name && name !== display) void onRename(node.path, name);
   };
 
-  const deleteButton = !editing && (
-    <button
-      className="row-delete"
-      title="삭제 (휴지통으로 이동)"
-      onClick={(e) => {
-        e.stopPropagation();
-        onDelete(node.path);
-      }}
-    >
-      ✕
-    </button>
+  const rowActions = !editing && (
+    <div className="row-actions">
+      <button
+        className="row-btn edit"
+        title="이름 바꾸기 (F2)"
+        onClick={(e) => {
+          e.stopPropagation();
+          onStartRename(node.path);
+        }}
+      >
+        ✎
+      </button>
+      <button
+        className="row-btn delete"
+        title="삭제 (휴지통으로 이동)"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(node.path);
+        }}
+      >
+        ✕
+      </button>
+    </div>
   );
 
   const dragProps = {
@@ -169,23 +181,17 @@ function TreeItem({
           ) : (
             <button
               className={"tree-row folder" + (targetDir === node.path ? " target" : "")}
-              onClick={() => onSelectFolder(node.path)}
-              onDoubleClick={() => onStartRename(node.path)}
+              onClick={() => {
+                onSelectFolder(node.path);
+                onToggle(node.path);
+              }}
               {...dragProps}
             >
-              <span
-                className="chevron"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggle(node.path);
-                }}
-              >
-                {open ? "▾" : "▸"}
-              </span>
+              <span className="chevron">{open ? "▾" : "▸"}</span>
               <span className="label">{node.name}</span>
             </button>
           )}
-          {deleteButton}
+          {rowActions}
         </div>
         {open && node.children && node.children.length > 0 && (
           <div className="tree-children">
@@ -224,13 +230,12 @@ function TreeItem({
           <button
             className={"tree-row note" + (selected === node.path ? " selected" : "")}
             onClick={() => onSelectNote(node.path)}
-            onDoubleClick={() => onStartRename(node.path)}
             {...dragProps}
           >
             <span className="label">{display}</span>
           </button>
         )}
-        {deleteButton}
+        {rowActions}
       </div>
     </li>
   );

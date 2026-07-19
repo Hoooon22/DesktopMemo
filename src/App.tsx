@@ -107,7 +107,6 @@ export default function App() {
 
   const selectFolder = (dir: string) => {
     setTargetDir(dir);
-    expandTo(dir);
   };
 
   const handleNewNote = async (dir?: string) => {
