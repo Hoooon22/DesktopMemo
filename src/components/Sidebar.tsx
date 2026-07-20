@@ -6,6 +6,7 @@ import Tree from "./Tree";
 
 type Props = {
   tree: TreeNode[];
+  dragging: string | null;
   selected: string;
   targetDir: string;
   collapsed: Set<string>;
@@ -23,6 +24,7 @@ type Props = {
   onStartRename: (path: string) => void;
   onEndRename: () => void;
   onMove: (path: string, dir: string) => void;
+  onReorder: (path: string, dir: string, index: number) => void;
   onDelete: (path: string) => void;
   onNewNoteIn: (dir: string) => void;
   onContextMenu: (node: TreeNode, x: number, y: number) => void;
@@ -32,6 +34,7 @@ type Props = {
 
 export default function Sidebar({
   tree,
+  dragging,
   selected,
   targetDir,
   collapsed,
@@ -49,6 +52,7 @@ export default function Sidebar({
   onStartRename,
   onEndRename,
   onMove,
+  onReorder,
   onDelete,
   onNewNoteIn,
   onContextMenu,
@@ -143,11 +147,16 @@ export default function Sidebar({
             e.preventDefault();
             rootEnter.current = 0;
             setRootOver(false);
-            onMove(e.dataTransfer.getData("text/plain"), "");
+            // 트리 빈 영역에 드롭 = 루트 최하단으로
+            const dragged = e.dataTransfer.getData("text/plain");
+            if (!dragged) return;
+            onReorder(dragged, "", tree.filter((n) => n.path !== dragged).length);
           }}
         >
           <Tree
             nodes={tree}
+            parentDir=""
+            dragging={dragging}
             selected={selected}
             targetDir={targetDir}
             collapsed={collapsed}
@@ -159,6 +168,7 @@ export default function Sidebar({
             onStartRename={onStartRename}
             onEndRename={onEndRename}
             onMove={onMove}
+            onReorder={onReorder}
             onDelete={onDelete}
             onNewNoteIn={onNewNoteIn}
             onContextMenu={onContextMenu}

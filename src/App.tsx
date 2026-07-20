@@ -8,6 +8,7 @@ import {
   moveEntry,
   QUICK_MEMO,
   renameEntry,
+  reorderEntry,
   restoreEntry,
   searchNotes,
   TODO_VIEW,
@@ -190,6 +191,21 @@ export default function App() {
     }
   };
 
+  const handleReorder = async (path: string, dir: string, index: number) => {
+    setDragging(null);
+    if (!path) return;
+    if (dir === path || dir.startsWith(path + "/")) return; // 자기 안으로 이동 금지
+    try {
+      const newPath = await reorderEntry(path, dir, index);
+      refreshTree();
+      expandTo(dir);
+      setSelected((s) => remapPath(s, path, newPath));
+      setTargetDir((d) => remapPath(d, path, newPath));
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   const showToast = (t: Toast) => {
     if (toastTimer.current !== undefined) window.clearTimeout(toastTimer.current);
     setToast(t);
@@ -270,6 +286,7 @@ export default function App() {
     <div className="app" style={{ gridTemplateColumns: `${sidebarWidth}px 1fr` }}>
       <Sidebar
         tree={tree}
+        dragging={dragging}
         selected={selected}
         targetDir={targetDir}
         collapsed={collapsed}
@@ -287,6 +304,7 @@ export default function App() {
         onStartRename={setRenamingPath}
         onEndRename={() => setRenamingPath(null)}
         onMove={handleMove}
+        onReorder={(p, d, i) => void handleReorder(p, d, i)}
         onDelete={handleDelete}
         onNewNoteIn={(dir) => void handleNewNote(dir)}
         onContextMenu={openCtxMenu}

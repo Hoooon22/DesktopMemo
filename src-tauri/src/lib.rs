@@ -191,6 +191,7 @@ pub fn run() {
             notes::create_folder,
             notes::rename_entry,
             notes::move_entry,
+            notes::reorder_entry,
             notes::delete_entry,
             notes::restore_entry,
             notes::search_notes,

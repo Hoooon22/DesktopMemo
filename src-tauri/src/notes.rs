@@ -8,6 +8,7 @@ use tauri::State;
 pub const QUICK_MEMO: &str = "QuickMemo.md";
 
 const TODO_FILE: &str = ".todos.json";
+const ORDER_FILE: &str = ".order.json";
 const SEARCH_LIMIT: usize = 50;
 
 pub struct NotesRoot(pub PathBuf);
@@ -101,6 +102,56 @@ fn natural_cmp(a: &str, b: &str) -> Ordering {
     }
 }
 
+/// 폴더의 수동 표시 순서(.order.json). 없거나 깨졌으면 빈 목록.
+fn read_order(dir: &Path) -> Vec<String> {
+    fs::read_to_string(dir.join(ORDER_FILE))
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default()
+}
+
+fn write_order(dir: &Path, order: &[String]) -> Result<(), String> {
+    let text = serde_json::to_string_pretty(order).map_err(|e| e.to_string())?;
+    fs::write(dir.join(ORDER_FILE), text).map_err(|e| e.to_string())
+}
+
+/// 폴더의 자식 이름을 화면 표시 순서대로 나열한다 (build_tree와 같은 규칙:
+/// 수동 순서 우선, 나머지는 폴더 먼저 이름순).
+fn display_names(dir: &Path, at_root: bool) -> Result<Vec<String>, String> {
+    let mut dirs: Vec<String> = Vec::new();
+    let mut files: Vec<String> = Vec::new();
+    for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.starts_with('.') {
+            continue;
+        }
+        let file_type = entry.file_type().map_err(|e| e.to_string())?;
+        if file_type.is_dir() {
+            dirs.push(name);
+        } else if name.to_lowercase().ends_with(".md") {
+            if at_root && name == QUICK_MEMO {
+                continue;
+            }
+            files.push(name);
+        }
+    }
+    dirs.sort_by(|a, b| natural_cmp(a, b));
+    files.sort_by(|a, b| natural_cmp(a, b));
+    let mut rest = dirs;
+    rest.append(&mut files);
+
+    let order = read_order(dir);
+    let mut out = Vec::with_capacity(rest.len());
+    for n in &order {
+        if let Some(i) = rest.iter().position(|x| x == n) {
+            out.push(rest.remove(i));
+        }
+    }
+    out.append(&mut rest);
+    Ok(out)
+}
+
 fn build_tree(dir: &Path, rel_prefix: &str) -> Result<Vec<TreeNode>, String> {
     let mut dirs: Vec<TreeNode> = Vec::new();
     let mut files: Vec<TreeNode> = Vec::new();
@@ -142,7 +193,21 @@ fn build_tree(dir: &Path, rel_prefix: &str) -> Result<Vec<TreeNode>, String> {
     dirs.sort_by(|x, y| natural_cmp(&x.name, &y.name));
     files.sort_by(|x, y| natural_cmp(&x.name, &y.name));
     dirs.append(&mut files);
-    Ok(dirs)
+
+    // .order.json의 수동 순서를 먼저 적용하고, 목록에 없는 항목은 기본 정렬로 뒤에 붙인다
+    let order = read_order(dir);
+    if order.is_empty() {
+        return Ok(dirs);
+    }
+    let mut rest = dirs;
+    let mut out = Vec::with_capacity(rest.len());
+    for n in &order {
+        if let Some(i) = rest.iter().position(|x| x.name == *n) {
+            out.push(rest.remove(i));
+        }
+    }
+    out.append(&mut rest);
+    Ok(out)
 }
 
 /// "새 메모.md", "새 메모 2.md"… 식으로 비어 있는 이름을 찾는다.
@@ -359,6 +424,16 @@ pub fn rename_entry(root: State<NotesRoot>, path: String, new_name: String) -> R
         return Err("이미 같은 이름이 있습니다".into());
     }
     fs::rename(&src, &dest).map_err(|e| e.to_string())?;
+    // 수동 순서 목록에 있던 항목이면 새 이름으로 교체해 위치를 유지한다
+    if let Ok(parent_abs) = resolve(&root.0, parent_rel) {
+        let old_name = path.rsplit('/').next().unwrap_or(&path);
+        let new_name = rel.rsplit('/').next().unwrap_or(&rel);
+        let mut order = read_order(&parent_abs);
+        if let Some(i) = order.iter().position(|n| n == old_name) {
+            order[i] = new_name.to_string();
+            let _ = write_order(&parent_abs, &order);
+        }
+    }
     Ok(rel)
 }
 
@@ -402,6 +477,89 @@ pub fn move_entry(root: State<NotesRoot>, path: String, dir: String) -> Result<S
         unique_name(&parent, &dir, &stem, Some(&ext))?
     };
     fs::rename(&src, &dest).map_err(|e| e.to_string())?;
+    // 원래 폴더의 수동 순서 목록에서 제거 (옮겨간 폴더에서는 기본 정렬 위치에 놓인다)
+    if let Ok(old_parent_abs) = resolve(&root.0, src_parent) {
+        let old_name = path.rsplit('/').next().unwrap_or(&path);
+        let order = read_order(&old_parent_abs);
+        if order.iter().any(|n| n == old_name) {
+            let filtered: Vec<String> = order.into_iter().filter(|n| n != old_name).collect();
+            let _ = write_order(&old_parent_abs, &filtered);
+        }
+    }
+    Ok(rel)
+}
+
+/// 항목을 지정 폴더의 지정 위치로 옮긴다 (드래그 순서 변경).
+/// index는 대상 폴더 표시 순서에서 "옮기는 항목을 뺀" 목록 기준 삽입 위치.
+#[tauri::command]
+pub fn reorder_entry(
+    root: State<NotesRoot>,
+    path: String,
+    dir: String,
+    index: usize,
+) -> Result<String, String> {
+    ensure_not_quick_memo(&path)?;
+    if path.is_empty() {
+        return Err("잘못된 경로입니다".into());
+    }
+    let src = resolve(&root.0, &path)?;
+    if !src.exists() {
+        return Err(format!("대상을 찾을 수 없습니다: {path}"));
+    }
+    if dir == path || dir.starts_with(&format!("{path}/")) {
+        return Err("폴더를 자기 안으로 옮길 수 없습니다".into());
+    }
+    let parent = resolve(&root.0, &dir)?;
+    if !parent.is_dir() {
+        return Err(format!("대상 폴더를 찾을 수 없습니다: {dir}"));
+    }
+    let src_parent = match path.rfind('/') {
+        Some(i) => &path[..i],
+        None => "",
+    };
+
+    // 다른 폴더로 가는 경우 실제 파일 이동 (이름 충돌 시 " 2" 접미사)
+    let rel = if src_parent == dir {
+        path.clone()
+    } else {
+        let (dest, rel) = if src.is_dir() {
+            let name = src
+                .file_name()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            unique_name(&parent, &dir, &name, None)?
+        } else {
+            let stem = src
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let ext = src
+                .extension()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "md".into());
+            unique_name(&parent, &dir, &stem, Some(&ext))?
+        };
+        fs::rename(&src, &dest).map_err(|e| e.to_string())?;
+        // 원래 폴더의 순서 목록에서 제거
+        if let Ok(old_parent) = resolve(&root.0, src_parent) {
+            let old_name = path.rsplit('/').next().unwrap_or(&path);
+            let order = read_order(&old_parent);
+            if order.iter().any(|n| n == old_name) {
+                let filtered: Vec<String> =
+                    order.into_iter().filter(|n| n != old_name).collect();
+                let _ = write_order(&old_parent, &filtered);
+            }
+        }
+        rel
+    };
+
+    // 현재 표시 순서에서 자신을 뺀 뒤 원하는 위치에 삽입해 순서를 고정한다
+    let name = rel.rsplit('/').next().unwrap_or(&rel).to_string();
+    let mut names = display_names(&parent, dir.is_empty())?;
+    names.retain(|n| *n != name);
+    let i = index.min(names.len());
+    names.insert(i, name);
+    write_order(&parent, &names)?;
     Ok(rel)
 }
 
@@ -506,6 +664,31 @@ mod tests {
 
         let (_, r3) = unique_name(&dir, "sub", "새 메모", Some("md")).unwrap();
         assert_eq!(r3, "sub/새 메모 3.md");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn order_file_controls_display_order() {
+        let dir = std::env::temp_dir().join("desktopmemo-test-order");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("폴더C")).unwrap();
+        fs::write(dir.join("a.md"), "").unwrap();
+        fs::write(dir.join("b.md"), "").unwrap();
+        fs::write(dir.join(QUICK_MEMO), "").unwrap();
+
+        // 순서 파일 없음: 폴더 먼저, 이름순. 루트에서는 빠른 메모 제외
+        assert_eq!(
+            display_names(&dir, true).unwrap(),
+            vec!["폴더C", "a.md", "b.md"]
+        );
+
+        // 순서 파일의 순서 우선, 없는 항목은 기본 정렬로 뒤에
+        write_order(&dir, &["b.md".to_string(), "폴더C".to_string()]).unwrap();
+        assert_eq!(
+            display_names(&dir, true).unwrap(),
+            vec!["b.md", "폴더C", "a.md"]
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }

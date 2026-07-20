@@ -18,6 +18,9 @@ export const createFolder = (dir: string) => invoke<string>("create_folder", { d
 export const renameEntry = (path: string, newName: string) =>
   invoke<string>("rename_entry", { path, newName });
 export const moveEntry = (path: string, dir: string) => invoke<string>("move_entry", { path, dir });
+// 드래그 순서 변경: dir의 표시 순서에서 (옮기는 항목 제외) index 위치로 삽입
+export const reorderEntry = (path: string, dir: string, index: number) =>
+  invoke<string>("reorder_entry", { path, dir, index });
 export const deleteEntry = (path: string) => invoke<void>("delete_entry", { path });
 export const restoreEntry = (path: string) => invoke<void>("restore_entry", { path });
 

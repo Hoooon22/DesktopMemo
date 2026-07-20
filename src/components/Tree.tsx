@@ -3,6 +3,8 @@ import type { TreeNode } from "../api";
 
 type TreeProps = {
   nodes: TreeNode[];
+  parentDir: string; // 이 트리 계층이 속한 폴더 (루트는 "")
+  dragging: string | null;
   selected: string;
   targetDir: string;
   collapsed: Set<string>;
@@ -14,6 +16,7 @@ type TreeProps = {
   onStartRename: (path: string) => void;
   onEndRename: () => void;
   onMove: (path: string, dir: string) => void;
+  onReorder: (path: string, dir: string, index: number) => void;
   onDelete: (path: string) => void;
   onNewNoteIn: (dir: string) => void;
   onContextMenu: (node: TreeNode, x: number, y: number) => void;
@@ -25,7 +28,7 @@ export default function Tree({ nodes, ...rest }: TreeProps) {
   return (
     <ul className="tree-list">
       {nodes.map((node) => (
-        <TreeItem key={node.path} node={node} {...rest} />
+        <TreeItem key={node.path} node={node} siblings={nodes} {...rest} />
       ))}
     </ul>
   );
@@ -71,10 +74,17 @@ function RenameInput({
   );
 }
 
-type ItemProps = Omit<TreeProps, "nodes"> & { node: TreeNode };
+type ItemProps = Omit<TreeProps, "nodes"> & { node: TreeNode; siblings: TreeNode[] };
+
+// 행 안 세로 위치에 따른 드롭 동작: 위쪽 = 앞에 삽입, 아래쪽 = 뒤에 삽입,
+// 폴더는 가운데(50%)가 "폴더 안으로"
+type DropPos = "before" | "after" | "into";
 
 function TreeItem({
   node,
+  siblings,
+  parentDir,
+  dragging,
   selected,
   targetDir,
   collapsed,
@@ -86,17 +96,55 @@ function TreeItem({
   onStartRename,
   onEndRename,
   onMove,
+  onReorder,
   onDelete,
   onNewNoteIn,
   onContextMenu,
   onDragStart,
   onDragEnd,
 }: ItemProps) {
-  const [dropOver, setDropOver] = useState(false);
-  const enterCount = useRef(0);
+  const [dropPos, setDropPos] = useState<DropPos | null>(null);
 
   const editing = renamingPath === node.path;
   const display = node.isDir ? node.name : node.name.replace(/\.md$/i, "");
+
+  // 자기 자신·자기 하위로는 드롭 불가
+  const isSelfOrChild = (dragged: string) =>
+    dragged === node.path || node.path.startsWith(dragged + "/");
+
+  const posFromEvent = (e: React.DragEvent): DropPos => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const rel = (e.clientY - r.top) / r.height;
+    if (node.isDir) return rel < 0.25 ? "before" : rel > 0.75 ? "after" : "into";
+    return rel < 0.5 ? "before" : "after";
+  };
+
+  const dropHandlers = {
+    onDragOver: (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "move";
+      setDropPos(dragging !== null && isSelfOrChild(dragging) ? null : posFromEvent(e));
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropPos(null);
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const pos = posFromEvent(e);
+      setDropPos(null);
+      const dragged = e.dataTransfer.getData("text/plain");
+      if (!dragged || isSelfOrChild(dragged)) return;
+      if (pos === "into") {
+        onMove(dragged, node.path);
+      } else {
+        const sibs = siblings.filter((s) => s.path !== dragged);
+        const i = sibs.findIndex((s) => s.path === node.path);
+        onReorder(dragged, parentDir, pos === "before" ? i : i + 1);
+      }
+    },
+  };
 
   const commitRename = (value: string) => {
     onEndRename();
@@ -159,35 +207,11 @@ function TreeItem({
   if (node.isDir) {
     const open = !collapsed.has(node.path);
     return (
-      <li
-        className={dropOver ? "drop-over" : undefined}
-        onDragEnter={(e) => {
-          e.stopPropagation();
-          enterCount.current++;
-          setDropOver(true);
-        }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          e.dataTransfer.dropEffect = "move";
-        }}
-        onDragLeave={(e) => {
-          e.stopPropagation();
-          enterCount.current--;
-          if (enterCount.current <= 0) {
-            enterCount.current = 0;
-            setDropOver(false);
-          }
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          enterCount.current = 0;
-          setDropOver(false);
-          onMove(e.dataTransfer.getData("text/plain"), node.path);
-        }}
-      >
-        <div className="row-wrap">
+      <li>
+        <div
+          className={"row-wrap" + (dropPos ? ` drop-${dropPos}` : "")}
+          {...dropHandlers}
+        >
           {editing ? (
             <div className="tree-row folder">
               <span className="chevron">{open ? "▾" : "▸"}</span>
@@ -214,6 +238,8 @@ function TreeItem({
           <div className="tree-children">
             <Tree
               nodes={node.children}
+              parentDir={node.path}
+              dragging={dragging}
               selected={selected}
               targetDir={targetDir}
               collapsed={collapsed}
@@ -225,6 +251,7 @@ function TreeItem({
               onStartRename={onStartRename}
               onEndRename={onEndRename}
               onMove={onMove}
+              onReorder={onReorder}
               onDelete={onDelete}
               onNewNoteIn={onNewNoteIn}
               onContextMenu={onContextMenu}
@@ -239,7 +266,10 @@ function TreeItem({
 
   return (
     <li>
-      <div className="row-wrap">
+      <div
+        className={"row-wrap" + (dropPos ? ` drop-${dropPos}` : "")}
+        {...dropHandlers}
+      >
         {editing ? (
           <div className="tree-row note">
             <span className="chevron" />
