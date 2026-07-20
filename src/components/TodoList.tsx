@@ -62,6 +62,15 @@ export default function TodoList() {
     setDraft("");
   };
 
+  // 표시 순서: 일정 없는 항목 최상단 → 일정 가까운(빠른) 순.
+  // 같은 일정은 stable sort로 추가 순서가 유지돼 최신에 만든 게 아래로 간다.
+  const sorted = [...todos].sort((a, b) => {
+    if (!a.start && !b.start) return 0;
+    if (!a.start) return -1;
+    if (!b.start) return 1;
+    return a.start.localeCompare(b.start);
+  });
+
   return (
     <section className="todo-view">
       <header className="editor-header">
@@ -80,7 +89,7 @@ export default function TodoList() {
         />
       </div>
       <ul className="todo-list">
-        {todos.map((t) => (
+        {sorted.map((t) => (
           <li key={t.id} className={"todo-item" + (t.done ? " done" : "")}>
             <span
               className="todo-handle"

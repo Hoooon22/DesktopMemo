@@ -59,6 +59,7 @@ function RenameInput({
       className="rename-input"
       value={value}
       autoFocus
+      spellCheck={false}
       onFocus={(e) => e.target.select()}
       onChange={(e) => setValue(e.target.value)}
       onKeyDown={(e) => {
@@ -190,6 +191,7 @@ function TreeItem({
           {editing ? (
             <div className="tree-row folder">
               <span className="chevron">{open ? "▾" : "▸"}</span>
+              <span className="type-icon">{open ? "📂" : "📁"}</span>
               <RenameInput initial={display} onCommit={commitRename} onCancel={onEndRename} />
             </div>
           ) : (
@@ -202,6 +204,7 @@ function TreeItem({
               {...dragProps}
             >
               <span className="chevron">{open ? "▾" : "▸"}</span>
+              <span className="type-icon">{open ? "📂" : "📁"}</span>
               <span className="label">{node.name}</span>
             </button>
           )}
@@ -239,6 +242,8 @@ function TreeItem({
       <div className="row-wrap">
         {editing ? (
           <div className="tree-row note">
+            <span className="chevron" />
+            <span className="type-icon">📄</span>
             <RenameInput initial={display} onCommit={commitRename} onCancel={onEndRename} />
           </div>
         ) : (
@@ -247,6 +252,8 @@ function TreeItem({
             onClick={() => onSelectNote(node.path)}
             {...dragProps}
           >
+            <span className="chevron" />
+            <span className="type-icon">📄</span>
             <span className="label">{display}</span>
           </button>
         )}

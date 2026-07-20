@@ -44,9 +44,34 @@ export default function App() {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [toast, setToast] = useState<Toast | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const v = Number(localStorage.getItem("sidebar-width"));
+    return v >= 160 && v <= 480 ? v : 240;
+  });
+  const [resizing, setResizing] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    localStorage.setItem("sidebar-width", String(sidebarWidth));
+  }, [sidebarWidth]);
+
+  // 사이드바-본문 경계 드래그로 너비 조절
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setResizing(true);
+    const onMove = (ev: MouseEvent) => {
+      setSidebarWidth(Math.min(480, Math.max(160, ev.clientX)));
+    };
+    const onUp = () => {
+      setResizing(false);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   const refreshTree = useCallback(() => {
     listTree()
@@ -242,7 +267,7 @@ export default function App() {
   };
 
   return (
-    <div className="app">
+    <div className="app" style={{ gridTemplateColumns: `${sidebarWidth}px 1fr` }}>
       <Sidebar
         tree={tree}
         selected={selected}
@@ -268,6 +293,13 @@ export default function App() {
         onDragStart={setDragging}
         onDragEnd={() => setDragging(null)}
       />
+      <div
+        className={"resizer" + (resizing ? " active" : "")}
+        style={{ left: sidebarWidth }}
+        onMouseDown={startResize}
+        title="드래그하여 사이드바 너비 조절"
+      />
+      {resizing && <div className="resize-overlay" />}
       <main className="main">
         {error && (
           <div className="error" onClick={() => setError(null)}>
