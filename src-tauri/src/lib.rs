@@ -123,7 +123,9 @@ pub fn run() {
             notes::move_entry,
             notes::delete_entry,
             notes::restore_entry,
-            notes::search_notes
+            notes::search_notes,
+            notes::read_todos,
+            notes::write_todos
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

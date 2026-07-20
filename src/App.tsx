@@ -10,10 +10,12 @@ import {
   renameEntry,
   restoreEntry,
   searchNotes,
+  TODO_VIEW,
 } from "./api";
 import type { SearchHit, TreeNode } from "./api";
 import Sidebar from "./components/Sidebar";
 import Editor from "./components/Editor";
+import TodoList from "./components/TodoList";
 
 function parentDir(path: string): string {
   const i = path.lastIndexOf("/");
@@ -102,7 +104,7 @@ export default function App() {
 
   const selectNote = (path: string) => {
     setSelected(path);
-    setTargetDir(path === QUICK_MEMO ? "" : parentDir(path));
+    setTargetDir(path === QUICK_MEMO || path === TODO_VIEW ? "" : parentDir(path));
   };
 
   const selectFolder = (dir: string) => {
@@ -217,7 +219,7 @@ export default function App() {
         e.preventDefault();
         a.newFolder();
       } else if (e.key === "F2") {
-        if (a.selected && a.selected !== QUICK_MEMO) {
+        if (a.selected && a.selected !== QUICK_MEMO && a.selected !== TODO_VIEW) {
           e.preventDefault();
           setRenamingPath(a.selected);
         }
@@ -272,7 +274,11 @@ export default function App() {
             {error}
           </div>
         )}
-        <Editor path={selected} onRename={(name) => handleRename(selected, name)} />
+        {selected === TODO_VIEW ? (
+          <TodoList />
+        ) : (
+          <Editor path={selected} onRename={(name) => handleRename(selected, name)} />
+        )}
       </main>
 
       {dragging && (

@@ -2,11 +2,12 @@ use std::cmp::Ordering;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
 pub const QUICK_MEMO: &str = "QuickMemo.md";
 
+const TODO_FILE: &str = ".todos.json";
 const SEARCH_LIMIT: usize = 50;
 
 pub struct NotesRoot(pub PathBuf);
@@ -27,6 +28,17 @@ pub struct SearchHit {
     path: String,
     name: String,
     snippet: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Todo {
+    id: String,
+    text: String,
+    done: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    start: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    end: Option<String>,
 }
 
 /// 노트 루트 기준 상대 경로만 허용한다 (".."·절대 경로 거부).
@@ -374,6 +386,22 @@ pub fn restore_entry(root: State<NotesRoot>, path: String) -> Result<(), String>
     candidates.sort_by_key(|i| i.time_deleted);
     let latest = candidates.pop().unwrap();
     trash::os_limited::restore_all([latest]).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn read_todos(root: State<NotesRoot>) -> Result<Vec<Todo>, String> {
+    let p = root.0.join(TODO_FILE);
+    if !p.exists() {
+        return Ok(vec![]);
+    }
+    let text = fs::read_to_string(p).map_err(|e| e.to_string())?;
+    serde_json::from_str(&text).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn write_todos(root: State<NotesRoot>, todos: Vec<Todo>) -> Result<(), String> {
+    let text = serde_json::to_string_pretty(&todos).map_err(|e| e.to_string())?;
+    fs::write(root.0.join(TODO_FILE), text).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

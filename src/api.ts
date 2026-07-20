@@ -23,3 +23,10 @@ export const restoreEntry = (path: string) => invoke<void>("restore_entry", { pa
 
 export type SearchHit = { path: string; name: string; snippet: string };
 export const searchNotes = (query: string) => invoke<SearchHit[]>("search_notes", { query });
+
+// 사이드바 고정 Todo 뷰를 나타내는 센티널 (실제 파일 경로 아님)
+export const TODO_VIEW = "::todo";
+
+export type Todo = { id: string; text: string; done: boolean; start?: string; end?: string };
+export const readTodos = () => invoke<Todo[]>("read_todos");
+export const writeTodos = (todos: Todo[]) => invoke<void>("write_todos", { todos });

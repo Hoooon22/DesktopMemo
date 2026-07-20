@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { RefObject } from "react";
-import { QUICK_MEMO } from "../api";
+import { QUICK_MEMO, TODO_VIEW } from "../api";
 import type { SearchHit, TreeNode } from "../api";
 import Tree from "./Tree";
 
@@ -73,13 +73,21 @@ export default function Sidebar({
           </button>
         </div>
       </div>
-      <button
-        className={"quick-memo" + (selected === QUICK_MEMO ? " selected" : "")}
-        onClick={() => onSelectNote(QUICK_MEMO)}
-        title="Ctrl+Alt+M: 어디서든 빠른 메모 열기"
-      >
-        ⚡ 빠른 메모
-      </button>
+      <div className="pinned">
+        <button
+          className={"quick-memo" + (selected === TODO_VIEW ? " selected" : "")}
+          onClick={() => onSelectNote(TODO_VIEW)}
+        >
+          ☑ Todo
+        </button>
+        <button
+          className={"quick-memo" + (selected === QUICK_MEMO ? " selected" : "")}
+          onClick={() => onSelectNote(QUICK_MEMO)}
+          title="Ctrl+Alt+M: 어디서든 빠른 메모 열기"
+        >
+          ⚡ 빠른 메모
+        </button>
+      </div>
       <div className="search-box">
         <input
           ref={searchInputRef}

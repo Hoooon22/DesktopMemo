@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark; /* 날짜 선택기·체크박스·스크롤바 등 네이티브 컨트롤 다크 */
   --bg: #16181d;
   --bg-panel: #1d2026;
   --bg-hover: #262a32;
@@ -87,8 +88,14 @@ button {
   color: var(--fg);
 }
 
+.pinned {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+}
+
 .quick-memo {
-  margin: 8px;
   padding: 8px 10px;
   border-radius: 6px;
   font-weight: 500;
@@ -431,6 +438,149 @@ button {
   border: none;
   border-top: 1px solid var(--border);
   margin: 1em 0;
+}
+
+/* ── Todo ─────────────────────────────── */
+
+.todo-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.todo-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.todo-add {
+  padding: 12px 20px 0;
+}
+
+.todo-add input {
+  width: 100%;
+  background: var(--bg-panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font: inherit;
+  outline: none;
+}
+
+.todo-add input:focus {
+  border-color: var(--accent);
+}
+
+.todo-add input::placeholder {
+  color: var(--fg-dim);
+}
+
+.todo-list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 10px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+
+.todo-item:hover {
+  background: var(--bg-panel);
+  border-color: var(--border);
+}
+
+.todo-handle {
+  color: var(--fg-dim);
+  cursor: grab;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.todo-item input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.todo-text {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--fg);
+  font: inherit;
+  padding: 2px 4px;
+}
+
+.todo-item.done .todo-text {
+  text-decoration: line-through;
+  color: var(--fg-dim);
+}
+
+.todo-date {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 4px;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.todo-item:hover .todo-date,
+.todo-date:focus {
+  border-color: var(--border);
+}
+
+.todo-tilde {
+  color: var(--fg-dim);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.todo-del {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--fg-dim);
+  font-size: 11px;
+  flex-shrink: 0;
+  visibility: hidden;
+}
+
+.todo-item:hover .todo-del {
+  visibility: visible;
+}
+
+.todo-del:hover {
+  background: var(--bg-hover);
+  color: var(--danger);
+}
+
+.todo-empty {
+  color: var(--fg-dim);
+  padding: 8px;
 }
 
 /* ── 토스트 ───────────────────────────── */
