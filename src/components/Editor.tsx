@@ -9,7 +9,8 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { Markdown } from "tiptap-markdown";
 import type { MarkdownSerializerState } from "@tiptap/pm/markdown";
 import type { Node as PMNode } from "@tiptap/pm/model";
-import { QUICK_MEMO, readNote, writeNote } from "../api";
+import { listTree, QUICK_MEMO, readNote, saveQuickMemo, writeNote } from "../api";
+import type { TreeNode } from "../api";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -56,9 +57,26 @@ type Props = {
   onRename: (newName: string) => Promise<boolean>;
 };
 
+type FolderOpt = { path: string; name: string; depth: number };
+
+function flattenFolders(nodes: TreeNode[], depth = 0, out: FolderOpt[] = []): FolderOpt[] {
+  for (const n of nodes) {
+    if (n.isDir) {
+      out.push({ path: n.path, name: n.name, depth });
+      if (n.children) flattenFolders(n.children, depth + 1, out);
+    }
+  }
+  return out;
+}
+
 export default function Editor({ path, onRename }: Props) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [titleDraft, setTitleDraft] = useState("");
+  const [savePop, setSavePop] = useState(false);
+  const [saveFolders, setSaveFolders] = useState<FolderOpt[]>([]);
+  const [saveDir, setSaveDir] = useState("");
+  const [saveName, setSaveName] = useState("");
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const [fontSize, setFontSize] = useState(() => {
     const v = Number(localStorage.getItem(FONT_KEY));
     return v >= FONT_MIN && v <= FONT_MAX ? v : FONT_DEFAULT;
@@ -217,6 +235,40 @@ export default function Editor({ path, onRename }: Props) {
     setTitleDraft(title);
   }, [title]);
 
+  // "폴더로 저장" 팝오버 열기 (폴더 목록은 열 때마다 새로 읽는다)
+  const openSavePop = async () => {
+    setSaveDir("");
+    setSaveName("");
+    setSaveErr(null);
+    setSavePop(true);
+    try {
+      setSaveFolders(flattenFolders(await listTree()));
+    } catch (e) {
+      setSaveErr(String(e));
+    }
+  };
+
+  const confirmSaveToFolder = async () => {
+    const name = saveName.trim();
+    if (!name) return;
+    // 대기 중인 자동 저장을 취소한다 — 저장이 끝나면 빠른 메모는 비워지므로,
+    // 그 뒤에 옛 내용이 QuickMemo.md에 다시 쓰이면 안 된다
+    if (timer.current !== undefined) {
+      window.clearTimeout(timer.current);
+      timer.current = undefined;
+    }
+    pending.current = null;
+    try {
+      await saveQuickMemo(saveDir, name, contentRef.current);
+      contentRef.current = "";
+      editor?.commands.setContent("", false);
+      setSavePop(false);
+      setSaveState("saved");
+    } catch (e) {
+      setSaveErr(String(e));
+    }
+  };
+
   const commitTitle = async () => {
     if (cancelTitle.current) {
       cancelTitle.current = false;
@@ -255,7 +307,59 @@ export default function Editor({ path, onRename }: Props) {
           onBlur={() => void commitTitle()}
         />
         <span className="save-state">{SAVE_LABEL[saveState]}</span>
+        {isQuickMemo && (
+          <button
+            className="save-to-folder-btn"
+            title="빠른 메모를 폴더에 새 메모로 저장"
+            onClick={() => void openSavePop()}
+          >
+            폴더로 저장
+          </button>
+        )}
       </header>
+      {isQuickMemo && savePop && (
+        <>
+          <div className="ctx-backdrop" onClick={() => setSavePop(false)} />
+          <div className="save-pop">
+            <label>
+              폴더
+              <select value={saveDir} onChange={(e) => setSaveDir(e.target.value)}>
+                <option value="">메모 루트</option>
+                {saveFolders.map((f) => (
+                  <option key={f.path} value={f.path}>
+                    {"  ".repeat(f.depth) + f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              이름
+              <input
+                value={saveName}
+                autoFocus
+                spellCheck={false}
+                placeholder="메모 이름"
+                onChange={(e) => setSaveName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void confirmSaveToFolder();
+                  else if (e.key === "Escape") setSavePop(false);
+                }}
+              />
+            </label>
+            {saveErr && <div className="save-pop-error">{saveErr}</div>}
+            <div className="save-pop-actions">
+              <button onClick={() => setSavePop(false)}>취소</button>
+              <button
+                className="primary"
+                disabled={!saveName.trim()}
+                onClick={() => void confirmSaveToFolder()}
+              >
+                저장
+              </button>
+            </div>
+          </div>
+        </>
+      )}
       <div className="editor-body" ref={bodyRef} style={{ fontSize: `${fontSize}px` }}>
         <EditorContent className="editor-content" editor={editor} />
       </div>

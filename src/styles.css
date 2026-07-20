@@ -758,6 +758,101 @@ button {
   color: var(--fg-dim);
 }
 
+/* ── 빠른 메모 → 폴더로 저장 ─────────────── */
+
+.save-to-folder-btn {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--fg-dim);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+
+.save-to-folder-btn:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+.save-pop {
+  position: fixed;
+  top: 48px;
+  right: 16px;
+  z-index: 31;
+  width: 260px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.save-pop label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+
+.save-pop select,
+.save-pop input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  outline: none;
+}
+
+.save-pop select:focus,
+.save-pop input:focus {
+  border-color: var(--accent);
+}
+
+.save-pop-error {
+  font-size: 12px;
+  color: var(--danger);
+  word-break: break-all;
+}
+
+.save-pop-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.save-pop-actions button {
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 6px;
+}
+
+.save-pop-actions button:hover {
+  background: var(--bg-hover);
+}
+
+.save-pop-actions button.primary {
+  background: var(--accent);
+  color: #10131a;
+}
+
+.save-pop-actions button.primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.save-pop-actions button.primary:not(:disabled):hover {
+  background: var(--accent);
+  filter: brightness(1.12);
+}
+
 .error {
   margin: 10px 20px 0;
   padding: 8px 12px;

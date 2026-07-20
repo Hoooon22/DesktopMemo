@@ -256,6 +256,54 @@ pub fn write_note(root: State<NotesRoot>, path: String, content: String) -> Resu
     fs::write(p, content).map_err(|e| e.to_string())
 }
 
+/// 새 메모 이름 검증: 공백 제거, 금지 문자 확인, .md 확장자 보장.
+fn validate_note_name(name: &str) -> Result<String, String> {
+    let mut name = name.trim().to_string();
+    if name.is_empty() {
+        return Err("이름이 비어 있습니다".into());
+    }
+    if name.starts_with('.')
+        || name
+            .chars()
+            .any(|c| matches!(c, '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+    {
+        return Err("사용할 수 없는 이름입니다".into());
+    }
+    if !name.to_lowercase().ends_with(".md") {
+        name.push_str(".md");
+    }
+    Ok(name)
+}
+
+/// 빠른 메모 내용을 지정한 폴더에 새 메모로 저장하고, 빠른 메모를 비운다.
+/// 내용은 디스크의 QuickMemo.md 대신 프런트가 들고 있는 최신본을 받는다
+/// (자동 저장 디바운스로 디스크가 뒤처져 있을 수 있음).
+#[tauri::command]
+pub fn save_quick_memo(
+    root: State<NotesRoot>,
+    dir: String,
+    name: String,
+    content: String,
+) -> Result<String, String> {
+    let parent = resolve(&root.0, &dir)?;
+    if !parent.is_dir() {
+        return Err(format!("대상 폴더를 찾을 수 없습니다: {dir}"));
+    }
+    let name = validate_note_name(&name)?;
+    let rel = if dir.is_empty() {
+        name
+    } else {
+        format!("{dir}/{name}")
+    };
+    let dest = resolve(&root.0, &rel)?;
+    if dest.exists() {
+        return Err("이미 같은 이름이 있습니다".into());
+    }
+    fs::write(&dest, &content).map_err(|e| e.to_string())?;
+    fs::write(root.0.join(QUICK_MEMO), "").map_err(|e| e.to_string())?;
+    Ok(rel)
+}
+
 #[tauri::command]
 pub fn create_note(root: State<NotesRoot>, dir: String) -> Result<String, String> {
     let parent = resolve(&root.0, &dir)?;
@@ -460,6 +508,16 @@ mod tests {
         assert_eq!(r3, "sub/새 메모 3.md");
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn validate_note_name_rules() {
+        assert_eq!(validate_note_name(" 회의록 ").unwrap(), "회의록.md");
+        assert_eq!(validate_note_name("memo.MD").unwrap(), "memo.MD");
+        assert!(validate_note_name("").is_err());
+        assert!(validate_note_name("   ").is_err());
+        assert!(validate_note_name("a/b").is_err());
+        assert!(validate_note_name(".hidden").is_err());
     }
 
     #[test]
