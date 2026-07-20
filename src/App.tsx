@@ -17,6 +17,7 @@ import type { SearchHit, TreeNode } from "./api";
 import Sidebar from "./components/Sidebar";
 import Editor from "./components/Editor";
 import TodoList from "./components/TodoList";
+import CommandPalette from "./components/CommandPalette";
 
 function parentDir(path: string): string {
   const i = path.lastIndexOf("/");
@@ -27,6 +28,13 @@ function remapPath(current: string, oldPath: string, newPath: string): string {
   if (current === oldPath) return newPath;
   if (current.startsWith(oldPath + "/")) return newPath + current.slice(oldPath.length);
   return current;
+}
+
+// 입력창·에디터 본문에 포커스가 있으면 Delete는 텍스트 편집용이므로 노트 삭제로 가로채면 안 된다
+function isEditableTarget(el: EventTarget | null): boolean {
+  const n = el as HTMLElement | null;
+  if (!n) return false;
+  return n.tagName === "INPUT" || n.tagName === "TEXTAREA" || n.isContentEditable;
 }
 
 type CtxMenu = { x: number; y: number; path: string; isDir: boolean };
@@ -45,6 +53,7 @@ export default function App() {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [toast, setToast] = useState<Toast | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const v = Number(localStorage.getItem("sidebar-width"));
     return v >= 160 && v <= 480 ? v : 240;
@@ -109,6 +118,13 @@ export default function App() {
     }, 200);
     return () => window.clearTimeout(t);
   }, [query]);
+
+  // 오류 메시지는 6초 뒤 자동으로 사라진다 (클릭하면 즉시 닫힘)
+  useEffect(() => {
+    if (!error) return;
+    const t = window.setTimeout(() => setError(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [error]);
 
   const toggleFolder = (path: string) => {
     setCollapsed((prev) => {
@@ -241,13 +257,21 @@ export default function App() {
     }
   };
 
-  // 키보드: Ctrl+N 새 메모, Ctrl+Shift+N 새 폴더, F2 이름 바꾸기, Ctrl+F 검색
-  const actionsRef = useRef({ selected: "", newNote: () => {}, newFolder: () => {} });
+  // 키보드: Ctrl+N 새 메모, Ctrl+Shift+N 새 폴더, F2 이름 바꾸기, Ctrl+F 검색, Delete 삭제
+  const actionsRef = useRef({
+    selected: "",
+    renaming: false,
+    newNote: () => {},
+    newFolder: () => {},
+    del: () => {},
+  });
   useEffect(() => {
     actionsRef.current = {
       selected,
+      renaming: renamingPath !== null,
       newNote: () => void handleNewNote(),
       newFolder: () => void handleNewFolder(),
+      del: () => void handleDelete(selected),
     };
   });
   useEffect(() => {
@@ -267,6 +291,15 @@ export default function App() {
       } else if (e.ctrlKey && e.key.toLowerCase() === "f") {
         e.preventDefault();
         searchRef.current?.focus();
+      } else if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      } else if (e.key === "Delete" && !isEditableTarget(e.target)) {
+        // 트리·폴더에 포커스가 있을 때만 동작(에디터 편집 중에는 위 가드가 막는다)
+        if (a.selected && a.selected !== QUICK_MEMO && a.selected !== TODO_VIEW && !a.renaming) {
+          e.preventDefault();
+          a.del();
+        }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -356,6 +389,16 @@ export default function App() {
             <button onClick={() => void handleUndo()}>실행 취소</button>
           )}
         </div>
+      )}
+
+      {paletteOpen && (
+        <CommandPalette
+          tree={tree}
+          onClose={() => setPaletteOpen(false)}
+          onSelectNote={selectNote}
+          onNewNote={() => void handleNewNote()}
+          onNewFolder={() => void handleNewFolder()}
+        />
       )}
 
       {ctxMenu && (

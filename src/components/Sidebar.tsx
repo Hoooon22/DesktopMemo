@@ -1,8 +1,19 @@
 import { useRef, useState } from "react";
-import type { RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import { QUICK_MEMO, TODO_VIEW } from "../api";
 import type { SearchHit, TreeNode } from "../api";
 import Tree from "./Tree";
+
+// 검색어와 일치하는 부분을 <mark>로 강조 (대소문자 무시)
+function highlight(text: string, query: string): ReactNode {
+  const q = query.trim();
+  if (!q) return text;
+  const esc = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${esc})`, "gi"));
+  return parts.map((part, i) =>
+    part.toLowerCase() === q.toLowerCase() ? <mark key={i}>{part}</mark> : part,
+  );
+}
 
 type Props = {
   tree: TreeNode[];
@@ -119,9 +130,11 @@ export default function Sidebar({
               onClick={() => onSelectNote(h.path)}
             >
               <span className="hit-name">
-                {h.path === QUICK_MEMO ? "⚡ 빠른 메모" : h.name.replace(/\.md$/i, "")}
+                {h.path === QUICK_MEMO
+                  ? "⚡ 빠른 메모"
+                  : highlight(h.name.replace(/\.md$/i, ""), query)}
               </span>
-              {h.snippet && <span className="hit-snippet">{h.snippet}</span>}
+              {h.snippet && <span className="hit-snippet">{highlight(h.snippet, query)}</span>}
             </button>
           ))}
         </div>

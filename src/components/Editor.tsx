@@ -211,13 +211,16 @@ export default function Editor({ path, onRename }: Props) {
     localStorage.setItem(FONT_KEY, String(fontSize));
   }, [fontSize]);
 
-  // Ctrl+S: 대기 중인 변경 즉시 저장
+  // Ctrl+S: 대기 중인 변경 즉시 저장, Ctrl+0: 글자 크기 기본값 복귀
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "s") {
         e.preventDefault();
         if (pending.current) void flushNow();
         else setSaveState("saved"); // 변경이 없어도 저장됨 피드백
+      } else if (e.ctrlKey && e.key === "0") {
+        e.preventDefault();
+        setFontSize(FONT_DEFAULT);
       }
     };
     window.addEventListener("keydown", onKey);

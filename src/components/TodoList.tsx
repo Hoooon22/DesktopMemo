@@ -131,7 +131,12 @@ export default function TodoList() {
               title="종료일 (선택)"
               onChange={(e) => patch(t.id, { end: e.target.value || undefined })}
             />
-            <button className="todo-del" title="삭제" onClick={() => remove(t.id)}>
+            <button
+              className="todo-del"
+              title="삭제"
+              aria-label={`할 일 삭제: ${t.text || "(제목 없음)"}`}
+              onClick={() => remove(t.id)}
+            >
               ✕
             </button>
           </li>

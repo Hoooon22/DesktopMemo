@@ -158,6 +158,7 @@ function TreeItem({
         <button
           className="row-btn add"
           title="이 폴더에 새 메모"
+          aria-label={`${node.name} 폴더에 새 메모`}
           onClick={(e) => {
             e.stopPropagation();
             onNewNoteIn(node.path);
@@ -169,6 +170,7 @@ function TreeItem({
       <button
         className="row-btn edit"
         title="이름 바꾸기 (F2)"
+        aria-label={`${display} 이름 바꾸기`}
         onClick={(e) => {
           e.stopPropagation();
           onStartRename(node.path);
@@ -179,6 +181,7 @@ function TreeItem({
       <button
         className="row-btn delete"
         title="삭제 (휴지통으로 이동)"
+        aria-label={`${display} 삭제`}
         onClick={(e) => {
           e.stopPropagation();
           onDelete(node.path);
