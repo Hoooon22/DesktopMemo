@@ -82,14 +82,14 @@ export default function Sidebar({
           className={"quick-memo" + (selected === TODO_VIEW ? " selected" : "")}
           onClick={() => onSelectNote(TODO_VIEW)}
         >
-          ☑ Todo
+          <span className="pinned-icon">☑️</span>Todo
         </button>
         <button
           className={"quick-memo" + (selected === QUICK_MEMO ? " selected" : "")}
           onClick={() => onSelectNote(QUICK_MEMO)}
           title="Ctrl+Alt+M: 어디서든 빠른 메모 열기"
         >
-          ⚡ 빠른 메모
+          <span className="pinned-icon">⚡</span>빠른 메모
         </button>
       </div>
       <div className="search-box">

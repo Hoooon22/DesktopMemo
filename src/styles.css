@@ -136,9 +136,21 @@ button {
 }
 
 .quick-memo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 10px;
   border-radius: 6px;
   font-weight: 500;
+}
+
+/* 고정 항목 아이콘: 이모지 크기·폭을 통일해 줄 맞춤 */
+.pinned-icon {
+  flex-shrink: 0;
+  width: 16px;
+  font-size: 13px;
+  line-height: 1;
+  text-align: center;
 }
 
 .quick-memo:hover {
