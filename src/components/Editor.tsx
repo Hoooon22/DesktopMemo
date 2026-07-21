@@ -175,9 +175,13 @@ export default function Editor({ path, onRename }: Props) {
   useEffect(() => {
     if (!editor) return;
     const unChanged = listen("notes-changed", () => {
-      if (pending.current || timer.current !== undefined) return;
+      // 편집 중(포커스·대기 저장·디바운스)에는 디스크로 화면을 덮지 않는다.
+      // 자동 저장이 파일 워처를 통해 자기 변경 이벤트로 되돌아와 입력을 방해하는 걸 막는다.
+      if (pending.current || timer.current !== undefined || editor.isFocused) return;
       readNote(pathRef.current)
         .then((text) => {
+          // 비동기 읽기를 기다리는 사이 편집이 재개됐으면 덮지 않는다 (오래된 내용으로 클로버 방지)
+          if (pending.current || timer.current !== undefined || editor.isFocused) return;
           if (text !== contentRef.current) {
             contentRef.current = text;
             editor.commands.setContent(text, false);
