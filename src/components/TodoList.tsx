@@ -62,13 +62,16 @@ export default function TodoList() {
     setDraft("");
   };
 
-  // 표시 순서: 일정 없는 항목 최상단 → 일정 가까운(빠른) 순.
-  // 같은 일정은 stable sort로 추가 순서가 유지돼 최신에 만든 게 아래로 간다.
+  // 표시 순서: 날짜 없는 항목 최상단 → 마감일(종료일, 없으면 시작일) 임박한 순.
+  // 같은 마감일은 stable sort로 추가 순서가 유지돼 최신에 만든 게 아래로 간다.
+  const deadline = (t: Todo) => t.end ?? t.start;
   const sorted = [...todos].sort((a, b) => {
-    if (!a.start && !b.start) return 0;
-    if (!a.start) return -1;
-    if (!b.start) return 1;
-    return a.start.localeCompare(b.start);
+    const da = deadline(a);
+    const db = deadline(b);
+    if (!da && !db) return 0;
+    if (!da) return -1;
+    if (!db) return 1;
+    return da.localeCompare(db);
   });
 
   return (
