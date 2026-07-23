@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import {
   createFolder,
@@ -7,11 +7,13 @@ import {
   listTree,
   moveEntry,
   QUICK_MEMO,
+  readFavorites,
   renameEntry,
   reorderEntry,
   restoreEntry,
   searchNotes,
   TODO_VIEW,
+  writeFavorites,
 } from "./api";
 import type { SearchHit, TreeNode } from "./api";
 import Sidebar from "./components/Sidebar";
@@ -28,6 +30,18 @@ function remapPath(current: string, oldPath: string, newPath: string): string {
   if (current === oldPath) return newPath;
   if (current.startsWith(oldPath + "/")) return newPath + current.slice(oldPath.length);
   return current;
+}
+
+// 트리에 실제로 존재하는 메모(파일) 경로 집합. 즐겨찾기에서 삭제·외부 변경으로
+// 사라진 항목을 표시에서 걸러내는 데 쓴다.
+function collectNotePaths(nodes: TreeNode[], out: Set<string>): void {
+  for (const n of nodes) {
+    if (n.isDir) {
+      if (n.children) collectNotePaths(n.children, out);
+    } else {
+      out.add(n.path);
+    }
+  }
 }
 
 // 입력창·에디터 본문에 포커스가 있으면 Delete는 텍스트 편집용이므로 노트 삭제로 가로채면 안 된다
@@ -51,6 +65,7 @@ export default function App() {
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [toast, setToast] = useState<Toast | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -90,6 +105,69 @@ export default function App() {
   }, []);
 
   useEffect(refreshTree, [refreshTree]);
+
+  useEffect(() => {
+    readFavorites()
+      .then(setFavorites)
+      .catch((e) => setError(String(e)));
+  }, []);
+
+  // 즐겨찾기 배열을 갱신하고 디스크에도 반영한다. updater가 이전 배열을
+  // 그대로 돌려주면(변화 없음) 불필요한 파일 쓰기를 건너뛴다.
+  const applyFavorites = useCallback((updater: (prev: string[]) => string[]) => {
+    setFavorites((prev) => {
+      const next = updater(prev);
+      if (next !== prev) writeFavorites(next).catch((e) => setError(String(e)));
+      return next;
+    });
+  }, []);
+
+  const toggleFavorite = useCallback(
+    (path: string) => {
+      if (!path || path === QUICK_MEMO || path === TODO_VIEW) return;
+      applyFavorites((prev) =>
+        prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path],
+      );
+    },
+    [applyFavorites],
+  );
+
+  // 이름 변경·이동으로 경로가 바뀐 즐겨찾기를 새 경로로 따라가게 한다
+  const remapFavorites = useCallback(
+    (oldPath: string, newPath: string) => {
+      applyFavorites((prev) => {
+        let changed = false;
+        const next = prev.map((p) => {
+          const r = remapPath(p, oldPath, newPath);
+          if (r !== p) changed = true;
+          return r;
+        });
+        return changed ? next : prev;
+      });
+    },
+    [applyFavorites],
+  );
+
+  const reorderFavorite = useCallback(
+    (dragged: string, target: string, pos: "before" | "after") => {
+      applyFavorites((prev) => {
+        if (dragged === target) return prev;
+        const without = prev.filter((p) => p !== dragged);
+        const ti = without.indexOf(target);
+        if (ti === -1) return prev;
+        without.splice(pos === "before" ? ti : ti + 1, 0, dragged);
+        return without;
+      });
+    },
+    [applyFavorites],
+  );
+
+  // 표시용: 트리에 실제로 존재하는 즐겨찾기만 (삭제/외부 변경분 제외)
+  const visibleFavorites = useMemo(() => {
+    const existing = new Set<string>();
+    collectNotePaths(tree, existing);
+    return favorites.filter((p) => existing.has(p));
+  }, [tree, favorites]);
 
   // 백엔드 이벤트: 외부 파일 변경 → 트리 갱신, 전역 단축키 → 빠른 메모
   useEffect(() => {
@@ -185,6 +263,7 @@ export default function App() {
       refreshTree();
       setSelected((s) => remapPath(s, path, newPath));
       setTargetDir((d) => remapPath(d, path, newPath));
+      remapFavorites(path, newPath);
       return true;
     } catch (e) {
       setError(String(e));
@@ -202,6 +281,7 @@ export default function App() {
       expandTo(dir);
       setSelected((s) => remapPath(s, path, newPath));
       setTargetDir((d) => remapPath(d, path, newPath));
+      remapFavorites(path, newPath);
     } catch (e) {
       setError(String(e));
     }
@@ -217,6 +297,7 @@ export default function App() {
       expandTo(dir);
       setSelected((s) => remapPath(s, path, newPath));
       setTargetDir((d) => remapPath(d, path, newPath));
+      remapFavorites(path, newPath);
     } catch (e) {
       setError(String(e));
     }
@@ -326,9 +407,12 @@ export default function App() {
         renamingPath={renamingPath}
         query={query}
         hits={hits}
+        favorites={visibleFavorites}
         searchInputRef={searchRef}
         onQueryChange={setQuery}
         onSelectNote={selectNote}
+        onUnfavorite={toggleFavorite}
+        onReorderFavorite={reorderFavorite}
         onSelectFolder={selectFolder}
         onToggle={toggleFolder}
         onNewNote={() => void handleNewNote()}
@@ -360,7 +444,12 @@ export default function App() {
         {selected === TODO_VIEW ? (
           <TodoList />
         ) : (
-          <Editor path={selected} onRename={(name) => handleRename(selected, name)} />
+          <Editor
+            path={selected}
+            onRename={(name) => handleRename(selected, name)}
+            isFavorite={favorites.includes(selected)}
+            onToggleFavorite={() => toggleFavorite(selected)}
+          />
         )}
       </main>
 
@@ -412,6 +501,16 @@ export default function App() {
             }}
           />
           <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
+            {!ctxMenu.isDir && (
+              <button
+                onClick={() => {
+                  toggleFavorite(ctxMenu.path);
+                  setCtxMenu(null);
+                }}
+              >
+                {favorites.includes(ctxMenu.path) ? "즐겨찾기 해제" : "⭐ 즐겨찾기 추가"}
+              </button>
+            )}
             {ctxMenu.isDir && (
               <button
                 onClick={() => {

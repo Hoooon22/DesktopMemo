@@ -8,6 +8,7 @@ use tauri::State;
 pub const QUICK_MEMO: &str = "QuickMemo.md";
 
 const TODO_FILE: &str = ".todos.json";
+const FAVORITES_FILE: &str = ".favorites.json";
 const ORDER_FILE: &str = ".order.json";
 const SEARCH_LIMIT: usize = 50;
 
@@ -608,6 +609,23 @@ pub fn read_todos(root: State<NotesRoot>) -> Result<Vec<Todo>, String> {
 pub fn write_todos(root: State<NotesRoot>, todos: Vec<Todo>) -> Result<(), String> {
     let text = serde_json::to_string_pretty(&todos).map_err(|e| e.to_string())?;
     fs::write(root.0.join(TODO_FILE), text).map_err(|e| e.to_string())
+}
+
+/// 즐겨찾기한 메모의 상대경로 목록. 배열 순서가 곧 표시 순서다.
+#[tauri::command]
+pub fn read_favorites(root: State<NotesRoot>) -> Result<Vec<String>, String> {
+    let p = root.0.join(FAVORITES_FILE);
+    if !p.exists() {
+        return Ok(vec![]);
+    }
+    let text = fs::read_to_string(p).map_err(|e| e.to_string())?;
+    serde_json::from_str(&text).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn write_favorites(root: State<NotesRoot>, favorites: Vec<String>) -> Result<(), String> {
+    let text = serde_json::to_string_pretty(&favorites).map_err(|e| e.to_string())?;
+    fs::write(root.0.join(FAVORITES_FILE), text).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

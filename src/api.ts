@@ -37,3 +37,8 @@ export const TODO_VIEW = "::todo";
 export type Todo = { id: string; text: string; done: boolean; start?: string; end?: string };
 export const readTodos = () => invoke<Todo[]>("read_todos");
 export const writeTodos = (todos: Todo[]) => invoke<void>("write_todos", { todos });
+
+// 즐겨찾기한 메모의 상대경로 목록 (배열 순서 = 표시 순서)
+export const readFavorites = () => invoke<string[]>("read_favorites");
+export const writeFavorites = (favorites: string[]) =>
+  invoke<void>("write_favorites", { favorites });

@@ -55,6 +55,8 @@ const KeepEmptyLineParagraph = Paragraph.extend({
 type Props = {
   path: string;
   onRename: (newName: string) => Promise<boolean>;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
 };
 
 type FolderOpt = { path: string; name: string; depth: number };
@@ -69,7 +71,7 @@ function flattenFolders(nodes: TreeNode[], depth = 0, out: FolderOpt[] = []): Fo
   return out;
 }
 
-export default function Editor({ path, onRename }: Props) {
+export default function Editor({ path, onRename, isFavorite, onToggleFavorite }: Props) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [titleDraft, setTitleDraft] = useState("");
   const [savePop, setSavePop] = useState(false);
@@ -313,6 +315,16 @@ export default function Editor({ path, onRename }: Props) {
           }}
           onBlur={() => void commitTitle()}
         />
+        {!isQuickMemo && (
+          <button
+            className={"fav-toggle" + (isFavorite ? " on" : "")}
+            title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+            aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+            onClick={onToggleFavorite}
+          >
+            {isFavorite ? "★" : "☆"}
+          </button>
+        )}
         <span className="save-state">{SAVE_LABEL[saveState]}</span>
         {isQuickMemo && (
           <button

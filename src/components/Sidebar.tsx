@@ -3,6 +3,7 @@ import type { ReactNode, RefObject } from "react";
 import { QUICK_MEMO, TODO_VIEW } from "../api";
 import type { SearchHit, TreeNode } from "../api";
 import Tree from "./Tree";
+import Favorites from "./Favorites";
 
 // 검색어와 일치하는 부분을 <mark>로 강조 (대소문자 무시)
 function highlight(text: string, query: string): ReactNode {
@@ -24,9 +25,12 @@ type Props = {
   renamingPath: string | null;
   query: string;
   hits: SearchHit[];
+  favorites: string[];
   searchInputRef: RefObject<HTMLInputElement>;
   onQueryChange: (q: string) => void;
   onSelectNote: (path: string) => void;
+  onUnfavorite: (path: string) => void;
+  onReorderFavorite: (dragged: string, target: string, pos: "before" | "after") => void;
   onSelectFolder: (dir: string) => void;
   onToggle: (path: string) => void;
   onNewNote: () => void;
@@ -52,9 +56,12 @@ export default function Sidebar({
   renamingPath,
   query,
   hits,
+  favorites,
   searchInputRef,
   onQueryChange,
   onSelectNote,
+  onUnfavorite,
+  onReorderFavorite,
   onSelectFolder,
   onToggle,
   onNewNote,
@@ -103,6 +110,15 @@ export default function Sidebar({
           <span className="pinned-icon">⚡</span>빠른 메모
         </button>
       </div>
+      {favorites.length > 0 && (
+        <Favorites
+          favorites={favorites}
+          selected={selected}
+          onSelect={onSelectNote}
+          onUnfavorite={onUnfavorite}
+          onReorder={onReorderFavorite}
+        />
+      )}
       <div className="search-box">
         <input
           ref={searchInputRef}

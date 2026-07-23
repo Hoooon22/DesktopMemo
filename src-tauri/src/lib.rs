@@ -197,7 +197,9 @@ pub fn run() {
             notes::search_notes,
             notes::save_quick_memo,
             notes::read_todos,
-            notes::write_todos
+            notes::write_todos,
+            notes::read_favorites,
+            notes::write_favorites
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
