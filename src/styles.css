@@ -469,8 +469,6 @@ button {
 
 .editor-body .ProseMirror h1 {
   font-size: 1.5em;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.3em;
 }
 
 .editor-body .ProseMirror h2 {
