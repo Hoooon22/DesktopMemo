@@ -1,20 +1,8 @@
 import { useRef, useState } from "react";
-import type { ReactNode, RefObject } from "react";
 import { QUICK_MEMO, TODO_VIEW } from "../api";
-import type { SearchHit, TreeNode } from "../api";
+import type { TreeNode } from "../api";
 import Tree from "./Tree";
 import Favorites from "./Favorites";
-
-// 검색어와 일치하는 부분을 <mark>로 강조 (대소문자 무시)
-function highlight(text: string, query: string): ReactNode {
-  const q = query.trim();
-  if (!q) return text;
-  const esc = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const parts = text.split(new RegExp(`(${esc})`, "gi"));
-  return parts.map((part, i) =>
-    part.toLowerCase() === q.toLowerCase() ? <mark key={i}>{part}</mark> : part,
-  );
-}
 
 type Props = {
   tree: TreeNode[];
@@ -23,11 +11,7 @@ type Props = {
   targetDir: string;
   collapsed: Set<string>;
   renamingPath: string | null;
-  query: string;
-  hits: SearchHit[];
   favorites: string[];
-  searchInputRef: RefObject<HTMLInputElement>;
-  onQueryChange: (q: string) => void;
   onSelectNote: (path: string) => void;
   onUnfavorite: (path: string) => void;
   onReorderFavorite: (dragged: string, target: string, pos: "before" | "after") => void;
@@ -54,11 +38,7 @@ export default function Sidebar({
   targetDir,
   collapsed,
   renamingPath,
-  query,
-  hits,
   favorites,
-  searchInputRef,
-  onQueryChange,
   onSelectNote,
   onUnfavorite,
   onReorderFavorite,
@@ -79,8 +59,6 @@ export default function Sidebar({
 }: Props) {
   const [rootOver, setRootOver] = useState(false);
   const rootEnter = useRef(0);
-
-  const searching = query.trim().length > 0;
 
   return (
     <aside className="sidebar">
@@ -119,93 +97,56 @@ export default function Sidebar({
           onReorder={onReorderFavorite}
         />
       )}
-      <div className="search-box">
-        <input
-          ref={searchInputRef}
-          className="search-input"
-          placeholder="검색 (Ctrl+F)"
-          value={query}
-          spellCheck={false}
-          onChange={(e) => onQueryChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              onQueryChange("");
-              e.currentTarget.blur();
-            }
-          }}
-        />
-      </div>
-
-      {searching ? (
-        <div className="search-results">
-          {hits.length === 0 && <div className="search-empty">결과 없음</div>}
-          {hits.map((h) => (
-            <button
-              key={h.path}
-              className={"search-hit" + (selected === h.path ? " selected" : "")}
-              onClick={() => onSelectNote(h.path)}
-            >
-              <span className="hit-name">
-                {h.path === QUICK_MEMO
-                  ? "⚡ 빠른 메모"
-                  : highlight(h.name.replace(/\.md$/i, ""), query)}
-              </span>
-              {h.snippet && <span className="hit-snippet">{highlight(h.snippet, query)}</span>}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <nav
-          className={"tree" + (rootOver ? " drop-over" : "")}
-          onDragEnter={() => {
-            rootEnter.current++;
-            setRootOver(true);
-          }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = "move";
-          }}
-          onDragLeave={() => {
-            rootEnter.current--;
-            if (rootEnter.current <= 0) {
-              rootEnter.current = 0;
-              setRootOver(false);
-            }
-          }}
-          onDrop={(e) => {
-            e.preventDefault();
+      <nav
+        className={"tree" + (rootOver ? " drop-over" : "")}
+        onDragEnter={() => {
+          rootEnter.current++;
+          setRootOver(true);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+        }}
+        onDragLeave={() => {
+          rootEnter.current--;
+          if (rootEnter.current <= 0) {
             rootEnter.current = 0;
             setRootOver(false);
-            // 트리 빈 영역에 드롭 = 루트 최하단으로
-            const dragged = e.dataTransfer.getData("text/plain");
-            if (!dragged) return;
-            onReorder(dragged, "", tree.filter((n) => n.path !== dragged).length);
-          }}
-        >
-          <Tree
-            nodes={tree}
-            parentDir=""
-            dragging={dragging}
-            selected={selected}
-            targetDir={targetDir}
-            collapsed={collapsed}
-            renamingPath={renamingPath}
-            onSelectNote={onSelectNote}
-            onSelectFolder={onSelectFolder}
-            onToggle={onToggle}
-            onRename={onRename}
-            onStartRename={onStartRename}
-            onEndRename={onEndRename}
-            onMove={onMove}
-            onReorder={onReorder}
-            onDelete={onDelete}
-            onNewNoteIn={onNewNoteIn}
-            onContextMenu={onContextMenu}
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-          />
-        </nav>
-      )}
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          rootEnter.current = 0;
+          setRootOver(false);
+          // 트리 빈 영역에 드롭 = 루트 최하단으로
+          const dragged = e.dataTransfer.getData("text/plain");
+          if (!dragged) return;
+          onReorder(dragged, "", tree.filter((n) => n.path !== dragged).length);
+        }}
+      >
+        <Tree
+          nodes={tree}
+          parentDir=""
+          dragging={dragging}
+          selected={selected}
+          targetDir={targetDir}
+          collapsed={collapsed}
+          renamingPath={renamingPath}
+          onSelectNote={onSelectNote}
+          onSelectFolder={onSelectFolder}
+          onToggle={onToggle}
+          onRename={onRename}
+          onStartRename={onStartRename}
+          onEndRename={onEndRename}
+          onMove={onMove}
+          onReorder={onReorder}
+          onDelete={onDelete}
+          onNewNoteIn={onNewNoteIn}
+          onContextMenu={onContextMenu}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+        />
+      </nav>
     </aside>
   );
 }

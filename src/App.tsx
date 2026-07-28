@@ -11,15 +11,16 @@ import {
   renameEntry,
   reorderEntry,
   restoreEntry,
-  searchNotes,
   TODO_VIEW,
   writeFavorites,
 } from "./api";
-import type { SearchHit, TreeNode } from "./api";
+import type { TreeNode } from "./api";
 import Sidebar from "./components/Sidebar";
+import SearchModal from "./components/SearchModal";
 import Editor from "./components/Editor";
 import TodoList from "./components/TodoList";
 import CommandPalette from "./components/CommandPalette";
+import TabBar from "./components/TabBar";
 
 function parentDir(path: string): string {
   const i = path.lastIndexOf("/");
@@ -54,33 +55,59 @@ function isEditableTarget(el: EventTarget | null): boolean {
 type CtxMenu = { x: number; y: number; path: string; isDir: boolean };
 type Toast = { msg: string; undoPath?: string };
 
+const TABS_KEY = "open-tabs";
+const ACTIVE_TAB_KEY = "active-tab";
+
+// 이전 세션에서 열려 있던 탭 목록 (없거나 깨졌으면 빠른 메모 하나)
+function loadTabs(): string[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(TABS_KEY) ?? "");
+    if (Array.isArray(v) && v.length > 0 && v.every((p): p is string => typeof p === "string"))
+      return v;
+  } catch {
+    // 기본값 사용
+  }
+  return [QUICK_MEMO];
+}
+
 export default function App() {
   const [tree, setTree] = useState<TreeNode[]>([]);
-  const [selected, setSelected] = useState<string>(QUICK_MEMO);
+  const [tabs, setTabs] = useState<string[]>(loadTabs);
+  const [selected, setSelected] = useState<string>(() => {
+    const t = loadTabs();
+    const a = localStorage.getItem(ACTIVE_TAB_KEY);
+    return a && t.includes(a) ? a : t[0];
+  });
   const [targetDir, setTargetDir] = useState<string>("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dragging, setDragging] = useState<string | null>(null);
   const [trashOver, setTrashOver] = useState(false);
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null);
-  const [query, setQuery] = useState("");
-  const [hits, setHits] = useState<SearchHit[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [toast, setToast] = useState<Toast | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const v = Number(localStorage.getItem("sidebar-width"));
     return v >= 160 && v <= 480 ? v : 240;
   });
   const [resizing, setResizing] = useState(false);
 
-  const searchRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     localStorage.setItem("sidebar-width", String(sidebarWidth));
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    localStorage.setItem(TABS_KEY, JSON.stringify(tabs));
+  }, [tabs]);
+
+  useEffect(() => {
+    localStorage.setItem(ACTIVE_TAB_KEY, selected);
+  }, [selected]);
 
   // 사이드바-본문 경계 드래그로 너비 조절
   const startResize = (e: React.MouseEvent) => {
@@ -132,6 +159,19 @@ export default function App() {
     [applyFavorites],
   );
 
+  // 이름 변경·이동으로 경로가 바뀐 탭을 새 경로로 따라가게 한다
+  const remapTabs = useCallback((oldPath: string, newPath: string) => {
+    setTabs((prev) => {
+      let changed = false;
+      const next = prev.map((p) => {
+        const r = remapPath(p, oldPath, newPath);
+        if (r !== p) changed = true;
+        return r;
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+
   // 이름 변경·이동으로 경로가 바뀐 즐겨찾기를 새 경로로 따라가게 한다
   const remapFavorites = useCallback(
     (oldPath: string, newPath: string) => {
@@ -173,6 +213,7 @@ export default function App() {
   useEffect(() => {
     const unChanged = listen("notes-changed", () => refreshTree()).catch(() => () => {});
     const unQuick = listen("open-quick-memo", () => {
+      setTabs((prev) => (prev.includes(QUICK_MEMO) ? prev : [...prev, QUICK_MEMO]));
       setSelected(QUICK_MEMO);
       setTargetDir("");
     }).catch(() => () => {});
@@ -181,21 +222,6 @@ export default function App() {
       void unQuick.then((f) => f());
     };
   }, [refreshTree]);
-
-  // 검색 (200ms 디바운스)
-  useEffect(() => {
-    const q = query.trim();
-    if (!q) {
-      setHits([]);
-      return;
-    }
-    const t = window.setTimeout(() => {
-      searchNotes(q)
-        .then(setHits)
-        .catch((e) => setError(String(e)));
-    }, 200);
-    return () => window.clearTimeout(t);
-  }, [query]);
 
   // 오류 메시지는 6초 뒤 자동으로 사라진다 (클릭하면 즉시 닫힘)
   useEffect(() => {
@@ -222,10 +248,54 @@ export default function App() {
     });
   };
 
-  const selectNote = (path: string) => {
+  // 탭 목록 변경 없이 활성 탭만 바꾼다
+  const activate = useCallback((path: string) => {
     setSelected(path);
     setTargetDir(path === QUICK_MEMO || path === TODO_VIEW ? "" : parentDir(path));
+  }, []);
+
+  // 노트를 탭으로 연다 (이미 열려 있으면 그 탭을 활성화)
+  const selectNote = (path: string) => {
+    setTabs((prev) => (prev.includes(path) ? prev : [...prev, path]));
+    activate(path);
   };
+
+  const closeTab = (path: string) => {
+    const i = tabs.indexOf(path);
+    if (i === -1) return;
+    const next = tabs.filter((p) => p !== path);
+    if (next.length === 0) {
+      setTabs([QUICK_MEMO]);
+      activate(QUICK_MEMO);
+      return;
+    }
+    setTabs(next);
+    if (selected === path) activate(next[Math.min(i, next.length - 1)]);
+  };
+
+  const cycleTab = (dir: 1 | -1) => {
+    if (tabs.length < 2) return;
+    const i = tabs.indexOf(selected);
+    activate(tabs[(i + dir + tabs.length) % tabs.length]);
+  };
+
+  // 활성 탭이 목록에서 사라지면(삭제·외부 변경 등) 첫 탭으로 되돌린다
+  useEffect(() => {
+    if (!tabs.includes(selected)) activate(tabs[0]);
+  }, [tabs, selected, activate]);
+
+  // 트리에 더 이상 존재하지 않는 노트 탭 정리 (외부 삭제·이전 세션의 잔재)
+  useEffect(() => {
+    if (tree.length === 0) return; // 초기 로드 전에는 판단하지 않는다
+    const existing = new Set<string>();
+    collectNotePaths(tree, existing);
+    const ok = (p: string) => p === QUICK_MEMO || p === TODO_VIEW || existing.has(p);
+    setTabs((prev) => {
+      if (prev.every(ok)) return prev;
+      const next = prev.filter(ok);
+      return next.length > 0 ? next : [QUICK_MEMO];
+    });
+  }, [tree]);
 
   const selectFolder = (dir: string) => {
     setTargetDir(dir);
@@ -237,7 +307,7 @@ export default function App() {
       const path = await createNote(target);
       refreshTree();
       expandTo(target);
-      setSelected(path);
+      selectNote(path); // 새 메모는 탭으로 연다
       setRenamingPath(path); // 만들자마자 이름부터 입력
     } catch (e) {
       setError(String(e));
@@ -263,6 +333,7 @@ export default function App() {
       refreshTree();
       setSelected((s) => remapPath(s, path, newPath));
       setTargetDir((d) => remapPath(d, path, newPath));
+      remapTabs(path, newPath);
       remapFavorites(path, newPath);
       return true;
     } catch (e) {
@@ -281,6 +352,7 @@ export default function App() {
       expandTo(dir);
       setSelected((s) => remapPath(s, path, newPath));
       setTargetDir((d) => remapPath(d, path, newPath));
+      remapTabs(path, newPath);
       remapFavorites(path, newPath);
     } catch (e) {
       setError(String(e));
@@ -297,6 +369,7 @@ export default function App() {
       expandTo(dir);
       setSelected((s) => remapPath(s, path, newPath));
       setTargetDir((d) => remapPath(d, path, newPath));
+      remapTabs(path, newPath);
       remapFavorites(path, newPath);
     } catch (e) {
       setError(String(e));
@@ -316,7 +389,12 @@ export default function App() {
     try {
       await deleteEntry(path);
       refreshTree();
-      setSelected((s) => (s === path || s.startsWith(path + "/") ? QUICK_MEMO : s));
+      // 삭제된 노트(또는 폴더 하위)의 탭을 닫는다. 활성 탭이 닫히면
+      // "활성 탭 사라짐" 이펙트가 첫 탭으로 되돌린다.
+      setTabs((prev) => {
+        const next = prev.filter((p) => p !== path && !p.startsWith(path + "/"));
+        return next.length > 0 ? next : [QUICK_MEMO];
+      });
       setTargetDir((d) => (d === path || d.startsWith(path + "/") ? parentDir(path) : d));
       const name = (path.split("/").pop() ?? path).replace(/\.md$/i, "");
       showToast({ msg: `"${name}" 삭제됨`, undoPath: path });
@@ -338,13 +416,16 @@ export default function App() {
     }
   };
 
-  // 키보드: Ctrl+N 새 메모, Ctrl+Shift+N 새 폴더, F2 이름 바꾸기, Ctrl+F 검색, Delete 삭제
+  // 키보드: Ctrl+N 새 메모, Ctrl+Shift+N 새 폴더, F2 이름 바꾸기, Ctrl+F 검색, Delete 삭제,
+  // Ctrl+W 탭 닫기, Ctrl+(Shift+)Tab 탭 전환
   const actionsRef = useRef({
     selected: "",
     renaming: false,
     newNote: () => {},
     newFolder: () => {},
     del: () => {},
+    closeTab: () => {},
+    cycleTab: (() => {}) as (dir: 1 | -1) => void,
   });
   useEffect(() => {
     actionsRef.current = {
@@ -353,6 +434,8 @@ export default function App() {
       newNote: () => void handleNewNote(),
       newFolder: () => void handleNewFolder(),
       del: () => void handleDelete(selected),
+      closeTab: () => closeTab(selected),
+      cycleTab,
     };
   });
   useEffect(() => {
@@ -371,10 +454,16 @@ export default function App() {
         }
       } else if (e.ctrlKey && e.key.toLowerCase() === "f") {
         e.preventDefault();
-        searchRef.current?.focus();
+        setSearchOpen((v) => !v);
       } else if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "p") {
         e.preventDefault();
         setPaletteOpen((v) => !v);
+      } else if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "w") {
+        e.preventDefault();
+        a.closeTab();
+      } else if (e.ctrlKey && e.key === "Tab") {
+        e.preventDefault();
+        a.cycleTab(e.shiftKey ? -1 : 1);
       } else if (e.key === "Delete" && !isEditableTarget(e.target)) {
         // 트리·폴더에 포커스가 있을 때만 동작(에디터 편집 중에는 위 가드가 막는다)
         if (a.selected && a.selected !== QUICK_MEMO && a.selected !== TODO_VIEW && !a.renaming) {
@@ -405,11 +494,7 @@ export default function App() {
         targetDir={targetDir}
         collapsed={collapsed}
         renamingPath={renamingPath}
-        query={query}
-        hits={hits}
         favorites={visibleFavorites}
-        searchInputRef={searchRef}
-        onQueryChange={setQuery}
         onSelectNote={selectNote}
         onUnfavorite={toggleFavorite}
         onReorderFavorite={reorderFavorite}
@@ -436,6 +521,7 @@ export default function App() {
       />
       {resizing && <div className="resize-overlay" />}
       <main className="main">
+        <TabBar tabs={tabs} selected={selected} onSelect={selectNote} onClose={closeTab} />
         {error && (
           <div className="error" onClick={() => setError(null)}>
             {error}
@@ -478,6 +564,14 @@ export default function App() {
             <button onClick={() => void handleUndo()}>실행 취소</button>
           )}
         </div>
+      )}
+
+      {searchOpen && (
+        <SearchModal
+          onClose={() => setSearchOpen(false)}
+          onSelectNote={selectNote}
+          onError={setError}
+        />
       )}
 
       {paletteOpen && (
