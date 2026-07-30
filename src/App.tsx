@@ -15,10 +15,12 @@ import {
   writeFavorites,
 } from "./api";
 import type { TreeNode } from "./api";
+import { useTodos } from "./useTodos";
 import Sidebar from "./components/Sidebar";
 import SearchModal from "./components/SearchModal";
 import Editor from "./components/Editor";
 import TodoList from "./components/TodoList";
+import QuickAddTodo from "./components/QuickAddTodo";
 import CommandPalette from "./components/CommandPalette";
 import TabBar from "./components/TabBar";
 
@@ -89,6 +91,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const v = Number(localStorage.getItem("sidebar-width"));
     return v >= 160 && v <= 480 ? v : 240;
@@ -96,6 +99,14 @@ export default function App() {
   const [resizing, setResizing] = useState(false);
 
   const toastTimer = useRef<number | undefined>(undefined);
+
+  // 할 일 목록은 사이드바 패널·전체 뷰·Ctrl+T 창이 공유한다
+  const { todos, add: addTodo, patch: patchTodo, remove: removeTodo } = useTodos();
+  const pendingTodos = todos.filter((t) => !t.done).length;
+  const toggleTodo = useCallback(
+    (id: string) => patchTodo(id, { done: true }),
+    [patchTodo],
+  );
 
   useEffect(() => {
     localStorage.setItem("sidebar-width", String(sidebarWidth));
@@ -416,8 +427,8 @@ export default function App() {
     }
   };
 
-  // 키보드: Ctrl+N 새 메모, Ctrl+Shift+N 새 폴더, F2 이름 바꾸기, Ctrl+F 검색, Delete 삭제,
-  // Ctrl+W 탭 닫기, Ctrl+(Shift+)Tab 탭 전환
+  // 키보드: Ctrl+N 새 메모, Ctrl+Shift+N 새 폴더, F2 이름 바꾸기, Ctrl+F 검색,
+  // Ctrl+T 할 일 추가, Delete 삭제, Ctrl+W 탭 닫기, Ctrl+(Shift+)Tab 탭 전환
   const actionsRef = useRef({
     selected: "",
     renaming: false,
@@ -458,6 +469,9 @@ export default function App() {
       } else if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "p") {
         e.preventDefault();
         setPaletteOpen((v) => !v);
+      } else if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "t") {
+        e.preventDefault();
+        setQuickAddOpen((v) => !v);
       } else if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "w") {
         e.preventDefault();
         a.closeTab();
@@ -495,6 +509,9 @@ export default function App() {
         collapsed={collapsed}
         renamingPath={renamingPath}
         favorites={visibleFavorites}
+        todos={todos}
+        onToggleTodo={toggleTodo}
+        onQuickAddTodo={() => setQuickAddOpen(true)}
         onSelectNote={selectNote}
         onUnfavorite={toggleFavorite}
         onReorderFavorite={reorderFavorite}
@@ -528,7 +545,12 @@ export default function App() {
           </div>
         )}
         {selected === TODO_VIEW ? (
-          <TodoList />
+          <TodoList
+            todos={todos}
+            onAdd={addTodo}
+            onPatch={patchTodo}
+            onRemove={removeTodo}
+          />
         ) : (
           <Editor
             path={selected}
@@ -564,6 +586,14 @@ export default function App() {
             <button onClick={() => void handleUndo()}>실행 취소</button>
           )}
         </div>
+      )}
+
+      {quickAddOpen && (
+        <QuickAddTodo
+          pending={pendingTodos}
+          onAdd={addTodo}
+          onClose={() => setQuickAddOpen(false)}
+        />
       )}
 
       {searchOpen && (

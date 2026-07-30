@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { QUICK_MEMO, TODO_VIEW } from "../api";
-import type { TreeNode } from "../api";
+import type { Todo, TreeNode } from "../api";
 import Tree from "./Tree";
 import Favorites from "./Favorites";
+import TodoPanel from "./TodoPanel";
 
 type Props = {
   tree: TreeNode[];
@@ -12,6 +13,9 @@ type Props = {
   collapsed: Set<string>;
   renamingPath: string | null;
   favorites: string[];
+  todos: Todo[];
+  onToggleTodo: (id: string) => void;
+  onQuickAddTodo: () => void;
   onSelectNote: (path: string) => void;
   onUnfavorite: (path: string) => void;
   onReorderFavorite: (dragged: string, target: string, pos: "before" | "after") => void;
@@ -39,6 +43,9 @@ export default function Sidebar({
   collapsed,
   renamingPath,
   favorites,
+  todos,
+  onToggleTodo,
+  onQuickAddTodo,
   onSelectNote,
   onUnfavorite,
   onReorderFavorite,
@@ -74,12 +81,6 @@ export default function Sidebar({
         </div>
       </div>
       <div className="pinned">
-        <button
-          className={"quick-memo" + (selected === TODO_VIEW ? " selected" : "")}
-          onClick={() => onSelectNote(TODO_VIEW)}
-        >
-          <span className="pinned-icon">☑️</span>Todo
-        </button>
         <button
           className={"quick-memo" + (selected === QUICK_MEMO ? " selected" : "")}
           onClick={() => onSelectNote(QUICK_MEMO)}
@@ -147,6 +148,13 @@ export default function Sidebar({
           onDragEnd={onDragEnd}
         />
       </nav>
+      <TodoPanel
+        todos={todos}
+        active={selected === TODO_VIEW}
+        onToggleDone={onToggleTodo}
+        onOpenView={() => onSelectNote(TODO_VIEW)}
+        onQuickAdd={onQuickAddTodo}
+      />
     </aside>
   );
 }

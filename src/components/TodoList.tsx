@@ -1,78 +1,34 @@
-import { useEffect, useRef, useState } from "react";
-import { readTodos, writeTodos } from "../api";
+import { useState } from "react";
+import { sortByUrgency } from "../useTodos";
 import type { Todo } from "../api";
 
-export default function TodoList() {
-  const [todos, setTodos] = useState<Todo[]>([]);
+type Props = {
+  todos: Todo[];
+  onAdd: (text: string) => void;
+  onPatch: (id: string, p: Partial<Todo>) => void;
+  onRemove: (id: string) => void;
+};
+
+// 날짜 편집·완료 항목 확인용 전체 화면. 일상적인 추가·체크는 사이드바
+// 패널과 Ctrl+T 창에서 하고, 여기는 관리 화면 역할이다.
+export default function TodoList({ todos, onAdd, onPatch, onRemove }: Props) {
   const [draft, setDraft] = useState("");
   const [dragging, setDragging] = useState<string | null>(null);
   const [trashOver, setTrashOver] = useState(false);
-  const saveTimer = useRef<number | undefined>(undefined);
-  const pendingSave = useRef<Todo[] | null>(null);
-  const loaded = useRef(false);
-
-  useEffect(() => {
-    readTodos()
-      .then((t) => {
-        setTodos(t);
-        loaded.current = true;
-      })
-      .catch(() => {
-        loaded.current = true;
-      });
-
-    // 언마운트 시 대기 중인 저장을 즉시 반영
-    return () => {
-      if (saveTimer.current !== undefined) {
-        window.clearTimeout(saveTimer.current);
-        saveTimer.current = undefined;
-      }
-      const p = pendingSave.current;
-      pendingSave.current = null;
-      if (p) writeTodos(p).catch(() => {});
-    };
-  }, []);
-
-  const update = (next: Todo[]) => {
-    setTodos(next);
-    if (!loaded.current) return;
-    pendingSave.current = next;
-    if (saveTimer.current !== undefined) window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => {
-      saveTimer.current = undefined;
-      const p = pendingSave.current;
-      pendingSave.current = null;
-      if (p) writeTodos(p).catch(() => {});
-    }, 300);
-  };
-
-  const patch = (id: string, p: Partial<Todo>) =>
-    update(todos.map((t) => (t.id === id ? { ...t, ...p } : t)));
 
   const remove = (id: string) => {
     setDragging(null);
     setTrashOver(false);
-    update(todos.filter((t) => t.id !== id));
+    onRemove(id);
   };
 
   const add = () => {
-    const text = draft.trim();
-    if (!text) return;
-    update([...todos, { id: crypto.randomUUID(), text, done: false }]);
+    if (!draft.trim()) return;
+    onAdd(draft);
     setDraft("");
   };
 
-  // 표시 순서: 날짜 없는 항목 최상단 → 마감일(종료일, 없으면 시작일) 임박한 순.
-  // 같은 마감일은 stable sort로 추가 순서가 유지돼 최신에 만든 게 아래로 간다.
-  const deadline = (t: Todo) => t.end ?? t.start;
-  const sorted = [...todos].sort((a, b) => {
-    const da = deadline(a);
-    const db = deadline(b);
-    if (!da && !db) return 0;
-    if (!da) return -1;
-    if (!db) return 1;
-    return da.localeCompare(db);
-  });
+  const sorted = sortByUrgency(todos);
 
   return (
     <section className="todo-view">
@@ -110,20 +66,20 @@ export default function TodoList() {
             <input
               type="checkbox"
               checked={t.done}
-              onChange={(e) => patch(t.id, { done: e.target.checked })}
+              onChange={(e) => onPatch(t.id, { done: e.target.checked })}
             />
             <input
               className="todo-text"
               value={t.text}
               spellCheck={false}
-              onChange={(e) => patch(t.id, { text: e.target.value })}
+              onChange={(e) => onPatch(t.id, { text: e.target.value })}
             />
             <input
               className="todo-date"
               type="date"
               value={t.start ?? ""}
               title="시작일"
-              onChange={(e) => patch(t.id, { start: e.target.value || undefined })}
+              onChange={(e) => onPatch(t.id, { start: e.target.value || undefined })}
             />
             <span className="todo-tilde">~</span>
             <input
@@ -132,7 +88,7 @@ export default function TodoList() {
               value={t.end ?? ""}
               min={t.start}
               title="종료일 (선택)"
-              onChange={(e) => patch(t.id, { end: e.target.value || undefined })}
+              onChange={(e) => onPatch(t.id, { end: e.target.value || undefined })}
             />
             <button
               className="todo-del"
