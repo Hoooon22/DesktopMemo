@@ -21,6 +21,7 @@ import SearchModal from "./components/SearchModal";
 import Editor from "./components/Editor";
 import TodoList from "./components/TodoList";
 import QuickAddTodo from "./components/QuickAddTodo";
+import HelpModal from "./components/HelpModal";
 import CommandPalette from "./components/CommandPalette";
 import TabBar from "./components/TabBar";
 
@@ -92,6 +93,7 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const v = Number(localStorage.getItem("sidebar-width"));
     return v >= 160 && v <= 480 ? v : 240;
@@ -107,6 +109,14 @@ export default function App() {
     (id: string) => patchTodo(id, { done: true }),
     [patchTodo],
   );
+
+  // 도움말은 다른 오버레이 위에 겹치지 않도록 열면서 나머지를 닫는다
+  const openHelp = useCallback(() => {
+    setPaletteOpen(false);
+    setSearchOpen(false);
+    setQuickAddOpen(false);
+    setHelpOpen(true);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("sidebar-width", String(sidebarWidth));
@@ -437,6 +447,7 @@ export default function App() {
     del: () => {},
     closeTab: () => {},
     cycleTab: (() => {}) as (dir: 1 | -1) => void,
+    toggleHelp: () => {},
   });
   useEffect(() => {
     actionsRef.current = {
@@ -447,6 +458,7 @@ export default function App() {
       del: () => void handleDelete(selected),
       closeTab: () => closeTab(selected),
       cycleTab,
+      toggleHelp: () => (helpOpen ? setHelpOpen(false) : openHelp()),
     };
   });
   useEffect(() => {
@@ -458,6 +470,9 @@ export default function App() {
       } else if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "n") {
         e.preventDefault();
         a.newFolder();
+      } else if (e.key === "F1") {
+        e.preventDefault();
+        a.toggleHelp();
       } else if (e.key === "F2") {
         if (a.selected && a.selected !== QUICK_MEMO && a.selected !== TODO_VIEW) {
           e.preventDefault();
@@ -512,6 +527,7 @@ export default function App() {
         todos={todos}
         onToggleTodo={toggleTodo}
         onQuickAddTodo={() => setQuickAddOpen(true)}
+        onHelp={openHelp}
         onSelectNote={selectNote}
         onUnfavorite={toggleFavorite}
         onReorderFavorite={reorderFavorite}
@@ -611,8 +627,11 @@ export default function App() {
           onSelectNote={selectNote}
           onNewNote={() => void handleNewNote()}
           onNewFolder={() => void handleNewFolder()}
+          onHelp={openHelp}
         />
       )}
+
+      {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
 
       {ctxMenu && (
         <>

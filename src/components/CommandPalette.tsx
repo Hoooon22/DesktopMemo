@@ -8,6 +8,7 @@ type Props = {
   onSelectNote: (path: string) => void;
   onNewNote: () => void;
   onNewFolder: () => void;
+  onHelp: () => void;
 };
 
 type Item = {
@@ -64,6 +65,7 @@ export default function CommandPalette({
   onSelectNote,
   onNewNote,
   onNewFolder,
+  onHelp,
 }: Props) {
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
@@ -75,6 +77,7 @@ export default function CommandPalette({
       { key: "cmd:todo", icon: "☑️", label: "Todo 열기", run: () => onSelectNote(TODO_VIEW) },
       { key: "cmd:new-note", icon: "📝", label: "새 메모", run: onNewNote },
       { key: "cmd:new-folder", icon: "📁", label: "새 폴더", run: onNewFolder },
+      { key: "cmd:help", icon: "❓", label: "도움말 · 단축키", run: onHelp },
     ];
     const notes: Item[] = flattenNotes(tree).map((n) => ({
       key: n.path,
@@ -84,7 +87,7 @@ export default function CommandPalette({
       run: () => onSelectNote(n.path),
     }));
     return [...commands, ...notes];
-  }, [tree, onSelectNote, onNewNote, onNewFolder]);
+  }, [tree, onSelectNote, onNewNote, onNewFolder, onHelp]);
 
   const results = useMemo<Item[]>(() => {
     const q = query.trim();
