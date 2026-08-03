@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { deadline, sortByUrgency, todayStr } from "../useTodos";
+import { deadline, todayStr } from "../useTodos";
 import type { Todo } from "../api";
 
 const PANEL_KEY = "todo-panel-open";
@@ -28,8 +28,9 @@ export default function TodoPanel({ todos, active, onToggleDone, onOpenView, onQ
 
   // 패널은 남은 할 일만 보여준다. 체크하면 목록에서 사라지고,
   // 완료 항목은 전체 Todo 뷰에서 확인·되돌릴 수 있다.
+  // 순서는 전체 뷰에서 드래그로 정한 수동 순서를 그대로 따른다.
   const today = todayStr();
-  const pending = sortByUrgency(todos.filter((t) => !t.done));
+  const pending = todos.filter((t) => !t.done);
 
   return (
     <div className="todo-panel">

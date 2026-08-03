@@ -13,16 +13,10 @@ export function todayStr(): string {
 // 마감일은 종료일이 있으면 종료일, 없으면 시작일
 export const deadline = (t: Todo) => t.end ?? t.start;
 
-// 표시 순서: 마감 임박한 순 → 날짜 없는 항목 → 완료 항목.
-// 같은 순위는 stable sort라 추가한 순서가 유지된다.
-export function sortByUrgency(todos: Todo[]): Todo[] {
-  const rank = (t: Todo) => (t.done ? 2 : deadline(t) ? 0 : 1);
-  return [...todos].sort((a, b) => {
-    const r = rank(a) - rank(b);
-    if (r !== 0) return r;
-    if (rank(a) !== 0) return 0;
-    return deadline(a)!.localeCompare(deadline(b)!);
-  });
+// 표시 순서: 배열 순서(드래그로 수동 변경) 그대로, 완료 항목만 뒤로.
+// stable sort라 같은 그룹 안에서는 수동 순서가 유지된다.
+export function sortDoneLast(todos: Todo[]): Todo[] {
+  return [...todos].sort((a, b) => Number(a.done) - Number(b.done));
 }
 
 export type TodosApi = {
@@ -30,6 +24,7 @@ export type TodosApi = {
   add: (text: string) => void;
   patch: (id: string, p: Partial<Todo>) => void;
   remove: (id: string) => void;
+  reorder: (dragged: string, target: string, before: boolean) => void;
 };
 
 // 할 일 목록의 단일 소유자. 사이드바 패널·전체 뷰·퀵 추가 모달이 모두
@@ -105,5 +100,22 @@ export function useTodos(): TodosApi {
     [apply],
   );
 
-  return { todos, add, patch, remove };
+  // 드래그 순서 변경: dragged를 target 앞/뒤로 옮긴다 (즐겨찾기와 같은 방식)
+  const reorder = useCallback(
+    (dragged: string, target: string, before: boolean) => {
+      apply((prev) => {
+        if (dragged === target) return prev;
+        const item = prev.find((t) => t.id === dragged);
+        if (!item) return prev;
+        const without = prev.filter((t) => t.id !== dragged);
+        const ti = without.findIndex((t) => t.id === target);
+        if (ti === -1) return prev;
+        without.splice(before ? ti : ti + 1, 0, item);
+        return without;
+      });
+    },
+    [apply],
+  );
+
+  return { todos, add, patch, remove, reorder };
 }

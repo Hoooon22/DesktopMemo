@@ -105,7 +105,13 @@ export default function App() {
   const toastTimer = useRef<number | undefined>(undefined);
 
   // 할 일 목록은 사이드바 패널·전체 뷰·Ctrl+T 창이 공유한다
-  const { todos, add: addTodo, patch: patchTodo, remove: removeTodo } = useTodos();
+  const {
+    todos,
+    add: addTodo,
+    patch: patchTodo,
+    remove: removeTodo,
+    reorder: reorderTodo,
+  } = useTodos();
   const pendingTodos = todos.filter((t) => !t.done).length;
   const toggleTodo = useCallback(
     (id: string) => patchTodo(id, { done: true }),
@@ -618,6 +624,7 @@ export default function App() {
             onAdd={addTodo}
             onPatch={patchTodo}
             onRemove={removeTodo}
+            onReorder={reorderTodo}
           />
         ) : (
           <Editor

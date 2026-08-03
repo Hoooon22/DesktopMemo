@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { sortByUrgency } from "../useTodos";
+import { sortDoneLast } from "../useTodos";
 import type { Todo } from "../api";
 
 type Props = {
@@ -7,14 +7,16 @@ type Props = {
   onAdd: (text: string) => void;
   onPatch: (id: string, p: Partial<Todo>) => void;
   onRemove: (id: string) => void;
+  onReorder: (dragged: string, target: string, before: boolean) => void;
 };
 
 // 날짜 편집·완료 항목 확인용 전체 화면. 일상적인 추가·체크는 사이드바
 // 패널과 Ctrl+T 창에서 하고, 여기는 관리 화면 역할이다.
-export default function TodoList({ todos, onAdd, onPatch, onRemove }: Props) {
+export default function TodoList({ todos, onAdd, onPatch, onRemove, onReorder }: Props) {
   const [draft, setDraft] = useState("");
   const [dragging, setDragging] = useState<string | null>(null);
   const [trashOver, setTrashOver] = useState(false);
+  const [dropAt, setDropAt] = useState<{ id: string; before: boolean } | null>(null);
 
   const remove = (id: string) => {
     setDragging(null);
@@ -28,7 +30,7 @@ export default function TodoList({ todos, onAdd, onPatch, onRemove }: Props) {
     setDraft("");
   };
 
-  const sorted = sortByUrgency(todos);
+  const sorted = sortDoneLast(todos);
 
   return (
     <section className="todo-view">
@@ -49,17 +51,42 @@ export default function TodoList({ todos, onAdd, onPatch, onRemove }: Props) {
       </div>
       <ul className="todo-list">
         {sorted.map((t) => (
-          <li key={t.id} className={"todo-item" + (t.done ? " done" : "")}>
+          <li
+            key={t.id}
+            className={
+              "todo-item" +
+              (t.done ? " done" : "") +
+              (dropAt?.id === t.id ? (dropAt.before ? " drop-before" : " drop-after") : "")
+            }
+            onDragOver={(e) => {
+              if (!dragging || dragging === t.id) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              const r = e.currentTarget.getBoundingClientRect();
+              setDropAt({ id: t.id, before: e.clientY < r.top + r.height / 2 });
+            }}
+            onDragLeave={() => setDropAt((d) => (d?.id === t.id ? null : d))}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (dragging && dragging !== t.id && dropAt?.id === t.id)
+                onReorder(dragging, t.id, dropAt.before);
+              setDragging(null);
+              setDropAt(null);
+            }}
+          >
             <span
               className="todo-handle"
-              title="드래그해서 휴지통으로 삭제"
+              title="드래그해서 순서 변경, 휴지통에 놓으면 삭제"
               draggable
               onDragStart={(e) => {
                 e.dataTransfer.setData("text/plain", "todo:" + t.id);
                 e.dataTransfer.effectAllowed = "move";
                 setDragging(t.id);
               }}
-              onDragEnd={() => setDragging(null)}
+              onDragEnd={() => {
+                setDragging(null);
+                setDropAt(null);
+              }}
             >
               ⠿
             </span>
