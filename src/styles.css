@@ -8,6 +8,7 @@
   --fg-dim: #8a8f9c;
   --accent: #7aa2f7;
   --border: #2a2e37;
+  --bg-folder: #22252c; /* 트리 폴더 행 바탕 (패널과 hover 중간 톤) */
   --danger: #e06c75;
 }
 
@@ -338,8 +339,16 @@ button {
   padding: 0;
 }
 
+/* 항목끼리 맞붙어 한 덩어리로 보이지 않게 최소한의 간격 */
+.tree-list li + li {
+  margin-top: 2px;
+}
+
+/* 계층마다 세로 가이드선을 그어 어느 폴더 소속인지 드러냄 */
 .tree-children {
-  padding-left: 14px;
+  margin-left: 14px;
+  padding-left: 4px;
+  border-left: 1px solid var(--border);
 }
 
 .tree-row {
@@ -348,11 +357,11 @@ button {
   gap: 5px;
   width: 100%;
   padding: 5px 48px 5px 8px; /* 오른쪽은 ✎ ✕ 버튼 자리 */
+  border-radius: 5px;
 }
 
 .tree-row.folder {
   padding-right: 70px; /* 폴더는 + ✎ ✕ 세 버튼 자리 */
-  border-radius: 5px;
   white-space: nowrap;
 }
 
@@ -375,9 +384,15 @@ button {
   background: var(--bg-hover);
 }
 
+/* 폴더는 옅은 바탕 + 굵은 글씨로 한 단계 띄워 메모와 구분 */
 .tree-row.folder {
   color: var(--fg);
   font-weight: 600;
+  background: var(--bg-folder);
+}
+
+.tree-row.folder:hover {
+  background: var(--bg-hover);
 }
 
 .tree-row.folder.target {
@@ -385,13 +400,19 @@ button {
   background: var(--bg-hover);
 }
 
+/* 메모는 한 톤 흐리게 두어 폴더가 먼저 눈에 들어오게 */
+.tree-row.note {
+  cursor: grab;
+  color: var(--fg-dim);
+}
+
+.tree-row.note:hover {
+  color: var(--fg);
+}
+
 .tree-row.note.selected {
   background: var(--bg-active);
   color: var(--accent);
-}
-
-.tree-row.note {
-  cursor: grab;
 }
 
 .row-wrap {
