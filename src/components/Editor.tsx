@@ -95,6 +95,7 @@ type Props = {
   onRename: (newName: string) => Promise<boolean>;
   isFavorite: boolean;
   onToggleFavorite: () => void;
+  onClose?: () => void; // 분할 창일 때만 전달됨 (헤더에 닫기 버튼 표시)
 };
 
 type FolderOpt = { path: string; name: string; depth: number };
@@ -109,7 +110,7 @@ function flattenFolders(nodes: TreeNode[], depth = 0, out: FolderOpt[] = []): Fo
   return out;
 }
 
-export default function Editor({ path, onRename, isFavorite, onToggleFavorite }: Props) {
+export default function Editor({ path, onRename, isFavorite, onToggleFavorite, onClose }: Props) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [titleDraft, setTitleDraft] = useState("");
   const [savePop, setSavePop] = useState(false);
@@ -391,6 +392,16 @@ export default function Editor({ path, onRename, isFavorite, onToggleFavorite }:
             onClick={() => void openSavePop()}
           >
             폴더로 저장
+          </button>
+        )}
+        {onClose && (
+          <button
+            className="split-close"
+            title="분할 창 닫기"
+            aria-label="분할 창 닫기"
+            onClick={onClose}
+          >
+            ×
           </button>
         )}
       </header>

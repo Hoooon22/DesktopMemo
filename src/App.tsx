@@ -58,6 +58,9 @@ function isEditableTarget(el: EventTarget | null): boolean {
 
 type CtxMenu = { x: number; y: number; path: string; isDir: boolean };
 type Toast = { msg: string; undoPath?: string };
+// 분할 뷰: 메모를 에디터 영역 가장자리에 드롭하면 그 방향에 두 번째 창이 열린다
+type SplitDir = "left" | "right" | "top" | "bottom";
+type Split = { path: string; dir: SplitDir };
 
 const TABS_KEY = "open-tabs";
 const ACTIVE_TAB_KEY = "active-tab";
@@ -101,6 +104,8 @@ export default function App() {
   });
   const [resizing, setResizing] = useState(false);
   const [pinned, setPinned] = useState(() => localStorage.getItem("always-on-top") === "1");
+  const [split, setSplit] = useState<Split | null>(null);
+  const [splitHint, setSplitHint] = useState<SplitDir | null>(null);
 
   const toastTimer = useRef<number | undefined>(undefined);
 
@@ -209,6 +214,11 @@ export default function App() {
     });
   }, []);
 
+  // 이름 변경·이동으로 경로가 바뀐 분할 창을 새 경로로 따라가게 한다
+  const remapSplit = useCallback((oldPath: string, newPath: string) => {
+    setSplit((s) => (s ? { ...s, path: remapPath(s.path, oldPath, newPath) } : s));
+  }, []);
+
   // 이름 변경·이동으로 경로가 바뀐 즐겨찾기를 새 경로로 따라가게 한다
   const remapFavorites = useCallback(
     (oldPath: string, newPath: string) => {
@@ -239,12 +249,18 @@ export default function App() {
     [applyFavorites],
   );
 
+  // 트리에 실제로 존재하는 메모 경로 집합
+  const notePaths = useMemo(() => {
+    const s = new Set<string>();
+    collectNotePaths(tree, s);
+    return s;
+  }, [tree]);
+
   // 표시용: 트리에 실제로 존재하는 즐겨찾기만 (삭제/외부 변경분 제외)
-  const visibleFavorites = useMemo(() => {
-    const existing = new Set<string>();
-    collectNotePaths(tree, existing);
-    return favorites.filter((p) => existing.has(p));
-  }, [tree, favorites]);
+  const visibleFavorites = useMemo(
+    () => favorites.filter((p) => notePaths.has(p)),
+    [notePaths, favorites],
+  );
 
   // 백엔드 이벤트: 외부 파일 변경 → 트리 갱신, 전역 단축키 → 빠른 메모
   useEffect(() => {
@@ -363,6 +379,7 @@ export default function App() {
       const next = prev.filter(ok);
       return next.length > 0 ? next : [QUICK_MEMO];
     });
+    setSplit((s) => (s && !ok(s.path) ? null : s));
   }, [tree]);
 
   const selectFolder = (dir: string) => {
@@ -403,6 +420,7 @@ export default function App() {
       setTargetDir((d) => remapPath(d, path, newPath));
       remapTabs(path, newPath);
       remapFavorites(path, newPath);
+      remapSplit(path, newPath);
       return true;
     } catch (e) {
       setError(String(e));
@@ -422,6 +440,7 @@ export default function App() {
       setTargetDir((d) => remapPath(d, path, newPath));
       remapTabs(path, newPath);
       remapFavorites(path, newPath);
+      remapSplit(path, newPath);
     } catch (e) {
       setError(String(e));
     }
@@ -439,6 +458,7 @@ export default function App() {
       setTargetDir((d) => remapPath(d, path, newPath));
       remapTabs(path, newPath);
       remapFavorites(path, newPath);
+      remapSplit(path, newPath);
     } catch (e) {
       setError(String(e));
     }
@@ -463,6 +483,9 @@ export default function App() {
         const next = prev.filter((p) => p !== path && !p.startsWith(path + "/"));
         return next.length > 0 ? next : [QUICK_MEMO];
       });
+      setSplit((s) =>
+        s && (s.path === path || s.path.startsWith(path + "/")) ? null : s,
+      );
       setTargetDir((d) => (d === path || d.startsWith(path + "/") ? parentDir(path) : d));
       const name = (path.split("/").pop() ?? path).replace(/\.md$/i, "");
       showToast({ msg: `"${name}" 삭제됨`, undoPath: path });
@@ -552,6 +575,21 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // 분할로 열 수 있는 대상: 실제 메모 파일과 빠른 메모 (Todo 뷰·폴더 제외)
+  const canSplitPath = (p: string) => p === QUICK_MEMO || notePaths.has(p);
+
+  // 에디터 영역 가장자리 20~25% 안쪽이면 해당 방향, 가운데면 null
+  const splitZone = (e: React.DragEvent<HTMLElement>): SplitDir | null => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const fx = (e.clientX - r.left) / r.width;
+    const fy = (e.clientY - r.top) / r.height;
+    if (fx < 0.2) return "left";
+    if (fx > 0.8) return "right";
+    if (fy < 0.25) return "top";
+    if (fy > 0.75) return "bottom";
+    return null;
+  };
+
   const openCtxMenu = (node: TreeNode, x: number, y: number) => {
     setCtxMenu({
       x: Math.min(x, window.innerWidth - 180),
@@ -600,7 +638,39 @@ export default function App() {
         title="드래그하여 사이드바 너비 조절"
       />
       {resizing && <div className="resize-overlay" />}
-      <main className="main">
+      <main
+        className="main"
+        onDragOver={(e) => {
+          // 탭 드래그 또는 트리 메모 드래그일 때만 분할 힌트를 보여준다
+          const isTab = e.dataTransfer.types.includes("text/desktopmemo-tab");
+          const isNote = dragging !== null && canSplitPath(dragging);
+          if (!isTab && !isNote) return;
+          if ((e.target as HTMLElement).closest(".tab-bar")) {
+            setSplitHint(null); // 탭 바 위에서는 탭 순서 변경이 우선
+            return;
+          }
+          const dir = splitZone(e);
+          setSplitHint(dir);
+          if (dir) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+          }
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) setSplitHint(null);
+        }}
+        onDrop={(e) => {
+          const dir = splitHint;
+          setSplitHint(null);
+          if (!dir) return;
+          const path =
+            e.dataTransfer.getData("text/desktopmemo-tab") ||
+            e.dataTransfer.getData("text/plain");
+          if (!path || !canSplitPath(path)) return;
+          e.preventDefault();
+          setSplit({ path, dir });
+        }}
+      >
         <TabBar
           tabs={tabs}
           selected={selected}
@@ -618,22 +688,38 @@ export default function App() {
             {error}
           </div>
         )}
-        {selected === TODO_VIEW ? (
-          <TodoList
-            todos={todos}
-            onAdd={addTodo}
-            onPatch={patchTodo}
-            onRemove={removeTodo}
-            onReorder={reorderTodo}
-          />
-        ) : (
-          <Editor
-            path={selected}
-            onRename={(name) => handleRename(selected, name)}
-            isFavorite={favorites.includes(selected)}
-            onToggleFavorite={() => toggleFavorite(selected)}
-          />
-        )}
+        <div className={"panes" + (split ? " split-" + split.dir : "")}>
+          <div className="pane">
+            {selected === TODO_VIEW ? (
+              <TodoList
+                todos={todos}
+                onAdd={addTodo}
+                onPatch={patchTodo}
+                onRemove={removeTodo}
+                onReorder={reorderTodo}
+              />
+            ) : (
+              <Editor
+                path={selected}
+                onRename={(name) => handleRename(selected, name)}
+                isFavorite={favorites.includes(selected)}
+                onToggleFavorite={() => toggleFavorite(selected)}
+              />
+            )}
+          </div>
+          {split && (
+            <div className="pane split-pane">
+              <Editor
+                path={split.path}
+                onRename={(name) => handleRename(split.path, name)}
+                isFavorite={favorites.includes(split.path)}
+                onToggleFavorite={() => toggleFavorite(split.path)}
+                onClose={() => setSplit(null)}
+              />
+            </div>
+          )}
+        </div>
+        {splitHint && <div className={"split-hint " + splitHint} />}
       </main>
 
       {dragging && (

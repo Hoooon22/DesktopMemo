@@ -1269,9 +1269,102 @@ button {
 /* ── 편집기 ───────────────────────────── */
 
 .main {
+  position: relative; /* 분할 드롭 힌트 오버레이 기준 */
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+/* ── 분할 뷰 ──────────────────────────── */
+
+.panes {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.panes.split-top,
+.panes.split-bottom {
+  flex-direction: column;
+}
+
+.pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.split-left .split-pane {
+  order: -1;
+  border-right: 1px solid var(--border);
+}
+
+.split-right .split-pane {
+  border-left: 1px solid var(--border);
+}
+
+.split-top .split-pane {
+  order: -1;
+  border-bottom: 1px solid var(--border);
+}
+
+.split-bottom .split-pane {
+  border-top: 1px solid var(--border);
+}
+
+/* 드래그 중 드롭 방향 미리보기 */
+.split-hint {
+  position: absolute;
+  z-index: 5;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 2px solid var(--accent);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.split-hint.left {
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+}
+
+.split-hint.right {
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+}
+
+.split-hint.top {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+}
+
+.split-hint.bottom {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+}
+
+.split-close {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  line-height: 20px;
+  border-radius: 4px;
+  text-align: center;
+  color: var(--fg-dim);
+}
+
+.split-close:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
 }
 
 /* ── 탭 바 ────────────────────────────── */
