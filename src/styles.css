@@ -1264,6 +1264,7 @@ button {
 }
 
 .tab {
+  position: relative; /* 드래그 순서 표시선 기준 */
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1275,6 +1276,28 @@ button {
   font-size: 13px;
   white-space: nowrap;
   cursor: pointer;
+}
+
+/* 탭 드래그 순서 표시선 */
+.tab.drop-before::before,
+.tab.drop-after::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.tab.drop-before::before {
+  left: -1px;
+}
+
+.tab.drop-after::after {
+  right: -1px;
 }
 
 .tab:hover {
@@ -1311,6 +1334,30 @@ button {
 .tab-close:hover {
   background: var(--bg-active);
   color: var(--fg);
+}
+
+/* 항상 위에 고정 토글 (탭이 넘쳐도 오른쪽 끝에 붙어 있음) */
+.pin-toggle {
+  position: sticky;
+  right: 0;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 10px;
+  font-size: 13px;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+.pin-toggle:hover {
+  background: var(--bg-hover);
+  opacity: 0.85;
+}
+
+.pin-toggle.on {
+  filter: none;
+  opacity: 1;
 }
 
 .editor {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   createFolder,
   createNote,
@@ -99,6 +100,7 @@ export default function App() {
     return v >= 160 && v <= 480 ? v : 240;
   });
   const [resizing, setResizing] = useState(false);
+  const [pinned, setPinned] = useState(() => localStorage.getItem("always-on-top") === "1");
 
   const toastTimer = useRef<number | undefined>(undefined);
 
@@ -129,6 +131,14 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(ACTIVE_TAB_KEY, selected);
   }, [selected]);
+
+  // 항상 위에 고정: 창에 반영하고 다음 실행을 위해 저장
+  useEffect(() => {
+    localStorage.setItem("always-on-top", pinned ? "1" : "0");
+    getCurrentWindow()
+      .setAlwaysOnTop(pinned)
+      .catch((e) => setError(String(e)));
+  }, [pinned]);
 
   // 사이드바-본문 경계 드래그로 너비 조절
   const startResize = (e: React.MouseEvent) => {
@@ -292,6 +302,37 @@ export default function App() {
     }
     setTabs(next);
     if (selected === path) activate(next[Math.min(i, next.length - 1)]);
+  };
+
+  // 모든 탭을 닫는다 (탭이 하나도 없으면 안 되므로 빠른 메모만 남긴다)
+  const closeAllTabs = () => {
+    setTabs([QUICK_MEMO]);
+    activate(QUICK_MEMO);
+  };
+
+  const closeOtherTabs = (path: string) => {
+    setTabs([path]);
+    activate(path);
+  };
+
+  const closeRightTabs = (path: string) => {
+    const i = tabs.indexOf(path);
+    if (i === -1) return;
+    const next = tabs.slice(0, i + 1);
+    setTabs(next);
+    if (!next.includes(selected)) activate(path);
+  };
+
+  // 탭 드래그로 순서 변경 (즐겨찾기 reorder와 같은 방식)
+  const reorderTab = (dragged: string, target: string, before: boolean) => {
+    setTabs((prev) => {
+      if (dragged === target) return prev;
+      const without = prev.filter((p) => p !== dragged);
+      const ti = without.indexOf(target);
+      if (ti === -1) return prev;
+      without.splice(before ? ti : ti + 1, 0, dragged);
+      return without;
+    });
   };
 
   const cycleTab = (dir: 1 | -1) => {
@@ -554,7 +595,18 @@ export default function App() {
       />
       {resizing && <div className="resize-overlay" />}
       <main className="main">
-        <TabBar tabs={tabs} selected={selected} onSelect={selectNote} onClose={closeTab} />
+        <TabBar
+          tabs={tabs}
+          selected={selected}
+          pinned={pinned}
+          onSelect={selectNote}
+          onClose={closeTab}
+          onCloseAll={closeAllTabs}
+          onCloseOthers={closeOtherTabs}
+          onCloseRight={closeRightTabs}
+          onReorder={reorderTab}
+          onTogglePin={() => setPinned((v) => !v)}
+        />
         {error && (
           <div className="error" onClick={() => setError(null)}>
             {error}

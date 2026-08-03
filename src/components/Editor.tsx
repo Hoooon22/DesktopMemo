@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { documentDir, join } from "@tauri-apps/api/path";
+import { mergeAttributes } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
@@ -9,7 +12,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { Markdown } from "tiptap-markdown";
 import type { MarkdownSerializerState } from "@tiptap/pm/markdown";
 import type { Node as PMNode } from "@tiptap/pm/model";
-import { listTree, QUICK_MEMO, readNote, saveQuickMemo, writeNote } from "../api";
+import { listTree, QUICK_MEMO, readNote, saveImage, saveQuickMemo, writeNote } from "../api";
 import type { TreeNode } from "../api";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -51,6 +54,41 @@ const KeepEmptyLineParagraph = Paragraph.extend({
     };
   },
 });
+
+// 노트 루트 절대 경로 (붙여넣은 이미지 표시용). 앱 시작 시 미리 받아 둔다.
+let notesRootAbs = "";
+void (async () => {
+  notesRootAbs = await join(await documentDir(), "DesktopMemo");
+})().catch(() => {});
+
+// 마크다운에는 ".assets/img-1.png" 같은 상대 경로를 저장하고,
+// 화면에 그릴 때만 asset 프로토콜 절대 주소로 바꾼다.
+function displaySrc(src: string): string {
+  if (!src || /^[a-z][a-z0-9+.-]*:/i.test(src)) return src; // http:, data: 등은 그대로
+  if (!notesRootAbs) return src;
+  return convertFileSrc(`${notesRootAbs}/${src}`);
+}
+
+const LocalImage = Image.extend({
+  renderHTML({ HTMLAttributes }) {
+    return [
+      "img",
+      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
+        src: displaySrc(HTMLAttributes.src as string),
+      }),
+    ];
+  },
+});
+
+// 클립보드 MIME 타입 → 저장 확장자
+const IMAGE_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/gif": "gif",
+  "image/webp": "webp",
+  "image/bmp": "bmp",
+  "image/svg+xml": "svg",
+};
 
 type Props = {
   path: string;
@@ -100,12 +138,32 @@ export default function Editor({ path, onRename, isFavorite, onToggleFavorite }:
       StarterKit.configure({ paragraph: false }),
       KeepEmptyLineParagraph,
       Link.configure({ openOnClick: false }),
-      Image,
+      LocalImage,
       Placeholder.configure({ placeholder: "메모를 입력하세요…" }),
       Markdown.configure({ html: false, transformPastedText: true }),
     ],
     editorProps: {
       attributes: { spellcheck: "false" }, // 오타 빨간 밑줄 비활성화
+      // 클립보드 이미지 붙여넣기: 파일로 저장하고 그 자리에 이미지 노드 삽입
+      handlePaste: (view, event) => {
+        const item = Array.from(event.clipboardData?.items ?? []).find((i) =>
+          i.type.startsWith("image/"),
+        );
+        const file = item?.getAsFile();
+        if (!file) return false;
+        event.preventDefault();
+        void (async () => {
+          try {
+            const bytes = Array.from(new Uint8Array(await file.arrayBuffer()));
+            const rel = await saveImage(bytes, IMAGE_EXT[file.type] ?? "png");
+            const node = view.state.schema.nodes.image.create({ src: rel });
+            view.dispatch(view.state.tr.replaceSelectionWith(node));
+          } catch {
+            setSaveState("error");
+          }
+        })();
+        return true;
+      },
     },
     onUpdate: ({ editor }) => {
       const md: string = editor.storage.markdown.getMarkdown();

@@ -8,6 +8,7 @@ use tauri::State;
 pub const QUICK_MEMO: &str = "QuickMemo.md";
 
 const TODO_FILE: &str = ".todos.json";
+const ASSETS_DIR: &str = ".assets";
 const FAVORITES_FILE: &str = ".favorites.json";
 const ORDER_FILE: &str = ".order.json";
 const SEARCH_LIMIT: usize = 50;
@@ -593,6 +594,33 @@ pub fn restore_entry(root: State<NotesRoot>, path: String) -> Result<(), String>
     candidates.sort_by_key(|i| i.time_deleted);
     let latest = candidates.pop().unwrap();
     trash::os_limited::restore_all([latest]).map_err(|e| e.to_string())
+}
+
+/// 붙여넣은 이미지를 숨김 폴더(.assets)에 저장하고 상대 경로를 돌려준다.
+/// 이름은 img-1.png, img-2.png… 식으로 빈 번호를 찾는다 (마크다운 링크가
+/// 깨지지 않도록 공백 없는 ASCII 이름만 쓴다).
+#[tauri::command]
+pub fn save_image(root: State<NotesRoot>, data: Vec<u8>, ext: String) -> Result<String, String> {
+    if !matches!(
+        ext.as_str(),
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "svg"
+    ) {
+        return Err(format!("지원하지 않는 이미지 형식입니다: {ext}"));
+    }
+    if data.is_empty() {
+        return Err("이미지 데이터가 비어 있습니다".into());
+    }
+    let assets = root.0.join(ASSETS_DIR);
+    fs::create_dir_all(&assets).map_err(|e| e.to_string())?;
+    for i in 1u32..1_000_000 {
+        let name = format!("img-{i}.{ext}");
+        let p = assets.join(&name);
+        if !p.exists() {
+            fs::write(&p, &data).map_err(|e| e.to_string())?;
+            return Ok(format!("{ASSETS_DIR}/{name}"));
+        }
+    }
+    Err("사용 가능한 이름을 찾지 못했습니다".into())
 }
 
 #[tauri::command]

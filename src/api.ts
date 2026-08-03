@@ -31,6 +31,10 @@ export const searchNotes = (query: string) => invoke<SearchHit[]>("search_notes"
 export const saveQuickMemo = (dir: string, name: string, content: string) =>
   invoke<string>("save_quick_memo", { dir, name, content });
 
+// 붙여넣은 이미지를 .assets 폴더에 저장하고 상대 경로를 돌려받는다
+export const saveImage = (data: number[], ext: string) =>
+  invoke<string>("save_image", { data, ext });
+
 // 사이드바 고정 Todo 뷰를 나타내는 센티널 (실제 파일 경로 아님)
 export const TODO_VIEW = "::todo";
 

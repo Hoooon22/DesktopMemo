@@ -196,6 +196,7 @@ pub fn run() {
             notes::restore_entry,
             notes::search_notes,
             notes::save_quick_memo,
+            notes::save_image,
             notes::read_todos,
             notes::write_todos,
             notes::read_favorites,
