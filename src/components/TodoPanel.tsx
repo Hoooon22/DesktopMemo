@@ -8,6 +8,7 @@ type Props = {
   todos: Todo[];
   active: boolean; // 전체 Todo 뷰가 열려 있는지
   onToggleDone: (id: string) => void;
+  onReorder: (dragged: string, target: string, before: boolean) => void;
   onOpenView: () => void;
   onQuickAdd: () => void;
 };
@@ -17,8 +18,17 @@ function dateLabel(d: string): string {
   return `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
 }
 
-export default function TodoPanel({ todos, active, onToggleDone, onOpenView, onQuickAdd }: Props) {
+export default function TodoPanel({
+  todos,
+  active,
+  onToggleDone,
+  onReorder,
+  onOpenView,
+  onQuickAdd,
+}: Props) {
   const [open, setOpen] = useState(() => localStorage.getItem(PANEL_KEY) !== "0");
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropAt, setDropAt] = useState<{ id: string; before: boolean } | null>(null);
 
   const toggleOpen = () =>
     setOpen((v) => {
@@ -66,7 +76,39 @@ export default function TodoPanel({ todos, active, onToggleDone, onOpenView, onQ
             const d = deadline(t);
             const urgency = !d ? "" : d < today ? " overdue" : d === today ? " today" : "";
             return (
-              <li key={t.id} className={"todo-panel-item" + urgency}>
+              <li
+                key={t.id}
+                className={
+                  "todo-panel-item" +
+                  urgency +
+                  (dropAt?.id === t.id ? (dropAt.before ? " drop-before" : " drop-after") : "")
+                }
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("application/x-todo", t.id);
+                  e.dataTransfer.effectAllowed = "move";
+                  setDragId(t.id);
+                }}
+                onDragOver={(e) => {
+                  if (!dragId || dragId === t.id) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setDropAt({ id: t.id, before: e.clientY < r.top + r.height / 2 });
+                }}
+                onDragLeave={() => setDropAt((d) => (d?.id === t.id ? null : d))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragId && dragId !== t.id && dropAt?.id === t.id)
+                    onReorder(dragId, t.id, dropAt.before);
+                  setDragId(null);
+                  setDropAt(null);
+                }}
+                onDragEnd={() => {
+                  setDragId(null);
+                  setDropAt(null);
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={false}

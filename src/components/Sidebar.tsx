@@ -15,6 +15,7 @@ type Props = {
   favorites: string[];
   todos: Todo[];
   onToggleTodo: (id: string) => void;
+  onReorderTodo: (dragged: string, target: string, before: boolean) => void;
   onQuickAddTodo: () => void;
   onHelp: () => void;
   onSelectNote: (path: string) => void;
@@ -46,6 +47,7 @@ export default function Sidebar({
   favorites,
   todos,
   onToggleTodo,
+  onReorderTodo,
   onQuickAddTodo,
   onHelp,
   onSelectNote,
@@ -157,6 +159,7 @@ export default function Sidebar({
         todos={todos}
         active={selected === TODO_VIEW}
         onToggleDone={onToggleTodo}
+        onReorder={onReorderTodo}
         onOpenView={() => onSelectNote(TODO_VIEW)}
         onQuickAdd={onQuickAddTodo}
       />

@@ -611,6 +611,7 @@ export default function App() {
         favorites={visibleFavorites}
         todos={todos}
         onToggleTodo={toggleTodo}
+        onReorderTodo={reorderTodo}
         onQuickAddTodo={() => setQuickAddOpen(true)}
         onHelp={openHelp}
         onSelectNote={selectNote}
@@ -640,7 +641,7 @@ export default function App() {
       {resizing && <div className="resize-overlay" />}
       <main
         className="main"
-        onDragOver={(e) => {
+        onDragOverCapture={(e) => {
           // 탭 드래그 또는 트리 메모 드래그일 때만 분할 힌트를 보여준다
           const isTab = e.dataTransfer.types.includes("text/desktopmemo-tab");
           const isNote = dragging !== null && canSplitPath(dragging);
@@ -649,17 +650,25 @@ export default function App() {
             setSplitHint(null); // 탭 바 위에서는 탭 순서 변경이 우선
             return;
           }
+          // 캡처 단계에서 가로챈다 — 에디터(ProseMirror)가 드롭을 받아
+          // 본문에 경로를 텍스트/링크로 삽입해 버리는 것을 막는다
+          e.preventDefault();
+          e.stopPropagation();
           const dir = splitZone(e);
           setSplitHint(dir);
-          if (dir) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = "copy";
-          }
+          // 소스가 effectAllowed="move"로 시작하므로 반드시 move여야 드롭이 발화한다
+          e.dataTransfer.dropEffect = dir ? "move" : "none";
         }}
         onDragLeave={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget as Node)) setSplitHint(null);
         }}
-        onDrop={(e) => {
+        onDropCapture={(e) => {
+          const isTab = e.dataTransfer.types.includes("text/desktopmemo-tab");
+          const isNote = dragging !== null && canSplitPath(dragging);
+          if (!isTab && !isNote) return;
+          if ((e.target as HTMLElement).closest(".tab-bar")) return;
+          e.preventDefault();
+          e.stopPropagation();
           const dir = splitHint;
           setSplitHint(null);
           if (!dir) return;
@@ -667,7 +676,6 @@ export default function App() {
             e.dataTransfer.getData("text/desktopmemo-tab") ||
             e.dataTransfer.getData("text/plain");
           if (!path || !canSplitPath(path)) return;
-          e.preventDefault();
           setSplit({ path, dir });
         }}
       >
