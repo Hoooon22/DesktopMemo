@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { LogicalSize, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 import {
   createFolder,
   createNote,
@@ -12,6 +13,7 @@ import {
   renameEntry,
   reorderEntry,
   restoreEntry,
+  setWindowOpacity,
   TODO_VIEW,
   writeFavorites,
 } from "./api";
@@ -25,6 +27,7 @@ import QuickAddTodo from "./components/QuickAddTodo";
 import HelpModal from "./components/HelpModal";
 import CommandPalette from "./components/CommandPalette";
 import TabBar from "./components/TabBar";
+import PopupMemo from "./components/PopupMemo";
 
 function parentDir(path: string): string {
   const i = path.lastIndexOf("/");
@@ -64,6 +67,13 @@ type Split = { path: string; dir: SplitDir };
 
 const TABS_KEY = "open-tabs";
 const ACTIVE_TAB_KEY = "active-tab";
+const POPUP_KEY = "popup-mode";
+const OPACITY_KEY = "popup-opacity";
+// 두 모드의 창 크기·위치를 따로 기억해 전환할 때마다 각자 마지막 상태로 돌아간다
+const NORMAL_BOUNDS_KEY = "normal-bounds";
+const POPUP_BOUNDS_KEY = "popup-bounds";
+const NORMAL_SIZE = new LogicalSize(1000, 700); // tauri.conf.json의 기본 창 크기
+const POPUP_SIZE = new LogicalSize(360, 460);
 
 // 이전 세션에서 열려 있던 탭 목록 (없거나 깨졌으면 빠른 메모 하나)
 function loadTabs(): string[] {
@@ -75,6 +85,34 @@ function loadTabs(): string[] {
     // 기본값 사용
   }
   return [QUICK_MEMO];
+}
+
+// 창 크기·위치 (물리 픽셀). outerPosition/innerSize는 setPosition/setSize와 짝이 맞는다.
+type Bounds = { x: number; y: number; w: number; h: number };
+
+async function saveBounds(key: string): Promise<void> {
+  const win = getCurrentWindow();
+  const [pos, size] = await Promise.all([win.outerPosition(), win.innerSize()]);
+  const b: Bounds = { x: pos.x, y: pos.y, w: size.width, h: size.height };
+  localStorage.setItem(key, JSON.stringify(b));
+}
+
+// 저장된 크기·위치로 복원한다. 저장된 값이 없으면 그 모드의 기본 크기만 적용.
+async function restoreBounds(key: string, fallback: LogicalSize): Promise<void> {
+  const win = getCurrentWindow();
+  let b: Bounds | null = null;
+  try {
+    const v = JSON.parse(localStorage.getItem(key) ?? "") as Bounds;
+    if ([v.x, v.y, v.w, v.h].every(Number.isFinite) && v.w > 0 && v.h > 0) b = v;
+  } catch {
+    // 저장된 값 없음 → 기본 크기
+  }
+  if (b) {
+    await win.setSize(new PhysicalSize(b.w, b.h));
+    await win.setPosition(new PhysicalPosition(b.x, b.y));
+  } else {
+    await win.setSize(fallback);
+  }
 }
 
 export default function App() {
@@ -106,6 +144,12 @@ export default function App() {
   const [pinned, setPinned] = useState(() => localStorage.getItem("always-on-top") === "1");
   const [split, setSplit] = useState<Split | null>(null);
   const [splitHint, setSplitHint] = useState<SplitDir | null>(null);
+  const [popup, setPopup] = useState(() => localStorage.getItem(POPUP_KEY) === "1");
+  const [opacity, setOpacity] = useState(() => {
+    const v = Number(localStorage.getItem(OPACITY_KEY));
+    return v >= 0.3 && v <= 1 ? v : 1;
+  });
+  const [hovering, setHovering] = useState(false);
 
   const toastTimer = useRef<number | undefined>(undefined);
 
@@ -143,13 +187,41 @@ export default function App() {
     localStorage.setItem(ACTIVE_TAB_KEY, selected);
   }, [selected]);
 
-  // 항상 위에 고정: 창에 반영하고 다음 실행을 위해 저장
+  // 항상 위에 고정: 창에 반영하고 다음 실행을 위해 저장.
+  // 팝업 모드는 고정이 전제이므로 pinned와 무관하게 항상 위에 둔다.
   useEffect(() => {
     localStorage.setItem("always-on-top", pinned ? "1" : "0");
     getCurrentWindow()
-      .setAlwaysOnTop(pinned)
+      .setAlwaysOnTop(pinned || popup)
       .catch((e) => setError(String(e)));
-  }, [pinned]);
+  }, [pinned, popup]);
+
+  // 팝업 모드 전환: 떠나는 모드의 창 크기·위치를 저장하고 들어가는 모드의 값을 복원한다.
+  // 첫 렌더에서는 창을 옮기지 않는다 — window-state 플러그인이 복원한 위치를 존중.
+  const boundsReady = useRef(false);
+  useEffect(() => {
+    localStorage.setItem(POPUP_KEY, popup ? "1" : "0");
+    const first = !boundsReady.current;
+    boundsReady.current = true;
+    void (async () => {
+      try {
+        if (!first) await saveBounds(popup ? NORMAL_BOUNDS_KEY : POPUP_BOUNDS_KEY);
+        await getCurrentWindow().setDecorations(!popup);
+        if (!first) {
+          if (popup) await restoreBounds(POPUP_BOUNDS_KEY, POPUP_SIZE);
+          else await restoreBounds(NORMAL_BOUNDS_KEY, NORMAL_SIZE);
+        }
+      } catch (e) {
+        setError(String(e));
+      }
+    })();
+  }, [popup]);
+
+  // 창 반투명은 팝업 모드에서만. 마우스를 올리면 편집할 수 있게 잠시 또렷해진다.
+  useEffect(() => {
+    localStorage.setItem(OPACITY_KEY, String(opacity));
+    setWindowOpacity(popup && !hovering ? opacity : 1).catch((e) => setError(String(e)));
+  }, [opacity, popup, hovering]);
 
   // 사이드바-본문 경계 드래그로 너비 조절
   const startResize = (e: React.MouseEvent) => {
@@ -512,6 +584,7 @@ export default function App() {
   const actionsRef = useRef({
     selected: "",
     renaming: false,
+    popup: false,
     newNote: () => {},
     newFolder: () => {},
     del: () => {},
@@ -523,6 +596,7 @@ export default function App() {
     actionsRef.current = {
       selected,
       renaming: renamingPath !== null,
+      popup,
       newNote: () => void handleNewNote(),
       newFolder: () => void handleNewFolder(),
       del: () => void handleDelete(selected),
@@ -534,6 +608,13 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const a = actionsRef.current;
+      if (e.ctrlKey && e.altKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        setPopup((v) => !v);
+        return;
+      }
+      // 팝업 모드에는 사이드바·탭·모달이 없으므로 나머지 단축키는 받지 않는다
+      if (a.popup) return;
       if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "n") {
         e.preventDefault();
         a.newNote();
@@ -599,6 +680,17 @@ export default function App() {
     });
   };
 
+  // 팝업 모드: 사이드바·탭 없이 빠른 메모만 보이는 작은 창
+  if (popup)
+    return (
+      <PopupMemo
+        opacity={opacity}
+        onOpacityChange={setOpacity}
+        onHoverChange={setHovering}
+        onExit={() => setPopup(false)}
+      />
+    );
+
   return (
     <div className="app" style={{ gridTemplateColumns: `${sidebarWidth}px 1fr` }}>
       <Sidebar
@@ -613,6 +705,7 @@ export default function App() {
         onToggleTodo={toggleTodo}
         onReorderTodo={reorderTodo}
         onQuickAddTodo={() => setQuickAddOpen(true)}
+        onTogglePopup={() => setPopup(true)}
         onHelp={openHelp}
         onSelectNote={selectNote}
         onUnfavorite={toggleFavorite}

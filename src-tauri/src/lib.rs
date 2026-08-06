@@ -15,6 +15,37 @@ fn show_main(app: &tauri::AppHandle) {
     }
 }
 
+// 창 전체를 반투명하게 (팝업 모드 투명도 슬라이더용).
+// Tauri에는 창 투명도 API가 없어 Windows 레이어드 윈도우 알파값을 직접 설정한다.
+// 1.0이면 레이어드 스타일 자체를 떼어내 평소 렌더링 경로로 되돌린다.
+#[tauri::command]
+fn set_window_opacity(window: tauri::Window, opacity: f64) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::Foundation::COLORREF;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetWindowLongPtrW, SetLayeredWindowAttributes, SetWindowLongPtrW, GWL_EXSTYLE,
+            LWA_ALPHA, WS_EX_LAYERED,
+        };
+        let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+        let alpha = (opacity.clamp(0.2, 1.0) * 255.0).round() as u8;
+        let layered = WS_EX_LAYERED.0 as isize;
+        unsafe {
+            let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+            if alpha == 255 {
+                SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex & !layered);
+            } else {
+                SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | layered);
+                SetLayeredWindowAttributes(hwnd, COLORREF(0), alpha, LWA_ALPHA)
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = (window, opacity);
+    Ok(())
+}
+
 // GitHub 릴리즈의 latest.json을 확인해 새 버전이 있으면 내려받아 설치 후 재시작
 fn check_for_updates(app: tauri::AppHandle) {
     use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
@@ -184,6 +215,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            set_window_opacity,
             notes::list_tree,
             notes::read_note,
             notes::write_note,

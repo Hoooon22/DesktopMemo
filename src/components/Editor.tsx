@@ -96,6 +96,7 @@ type Props = {
   isFavorite: boolean;
   onToggleFavorite: () => void;
   onClose?: () => void; // 분할 창일 때만 전달됨 (헤더에 닫기 버튼 표시)
+  compact?: boolean; // 팝업 모드: 헤더 없이 본문만 (저장 표시는 본문 위 작은 라벨)
 };
 
 type FolderOpt = { path: string; name: string; depth: number };
@@ -110,7 +111,14 @@ function flattenFolders(nodes: TreeNode[], depth = 0, out: FolderOpt[] = []): Fo
   return out;
 }
 
-export default function Editor({ path, onRename, isFavorite, onToggleFavorite, onClose }: Props) {
+export default function Editor({
+  path,
+  onRename,
+  isFavorite,
+  onToggleFavorite,
+  onClose,
+  compact,
+}: Props) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [titleDraft, setTitleDraft] = useState("");
   const [savePop, setSavePop] = useState(false);
@@ -355,56 +363,60 @@ export default function Editor({ path, onRename, isFavorite, onToggleFavorite, o
   };
 
   return (
-    <section className="editor">
-      <header className="editor-header">
-        <input
-          className="title-input"
-          value={titleDraft}
-          readOnly={isQuickMemo}
-          spellCheck={false}
-          title={isQuickMemo ? undefined : "클릭해서 제목 수정"}
-          onChange={(e) => setTitleDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.currentTarget.blur();
-            } else if (e.key === "Escape") {
-              cancelTitle.current = true;
-              e.currentTarget.blur();
-            }
-          }}
-          onBlur={() => void commitTitle()}
-        />
-        {!isQuickMemo && (
-          <button
-            className={"fav-toggle" + (isFavorite ? " on" : "")}
-            title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-            aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-            onClick={onToggleFavorite}
-          >
-            {isFavorite ? "★" : "☆"}
-          </button>
-        )}
-        <span className="save-state">{SAVE_LABEL[saveState]}</span>
-        {isQuickMemo && (
-          <button
-            className="save-to-folder-btn"
-            title="빠른 메모를 폴더에 새 메모로 저장"
-            onClick={() => void openSavePop()}
-          >
-            폴더로 저장
-          </button>
-        )}
-        {onClose && (
-          <button
-            className="split-close"
-            title="분할 창 닫기"
-            aria-label="분할 창 닫기"
-            onClick={onClose}
-          >
-            ×
-          </button>
-        )}
-      </header>
+    <section className={"editor" + (compact ? " compact" : "")}>
+      {compact ? (
+        <span className="save-state floating">{SAVE_LABEL[saveState]}</span>
+      ) : (
+        <header className="editor-header">
+          <input
+            className="title-input"
+            value={titleDraft}
+            readOnly={isQuickMemo}
+            spellCheck={false}
+            title={isQuickMemo ? undefined : "클릭해서 제목 수정"}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.currentTarget.blur();
+              } else if (e.key === "Escape") {
+                cancelTitle.current = true;
+                e.currentTarget.blur();
+              }
+            }}
+            onBlur={() => void commitTitle()}
+          />
+          {!isQuickMemo && (
+            <button
+              className={"fav-toggle" + (isFavorite ? " on" : "")}
+              title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+              aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+              onClick={onToggleFavorite}
+            >
+              {isFavorite ? "★" : "☆"}
+            </button>
+          )}
+          <span className="save-state">{SAVE_LABEL[saveState]}</span>
+          {isQuickMemo && (
+            <button
+              className="save-to-folder-btn"
+              title="빠른 메모를 폴더에 새 메모로 저장"
+              onClick={() => void openSavePop()}
+            >
+              폴더로 저장
+            </button>
+          )}
+          {onClose && (
+            <button
+              className="split-close"
+              title="분할 창 닫기"
+              aria-label="분할 창 닫기"
+              onClick={onClose}
+            >
+              ×
+            </button>
+          )}
+        </header>
+      )}
       {isQuickMemo && savePop && (
         <>
           <div className="ctx-backdrop" onClick={() => setSavePop(false)} />

@@ -17,6 +17,7 @@ type Props = {
   onToggleTodo: (id: string) => void;
   onReorderTodo: (dragged: string, target: string, before: boolean) => void;
   onQuickAddTodo: () => void;
+  onTogglePopup: () => void;
   onHelp: () => void;
   onSelectNote: (path: string) => void;
   onUnfavorite: (path: string) => void;
@@ -49,6 +50,7 @@ export default function Sidebar({
   onToggleTodo,
   onReorderTodo,
   onQuickAddTodo,
+  onTogglePopup,
   onHelp,
   onSelectNote,
   onUnfavorite,
@@ -81,6 +83,12 @@ export default function Sidebar({
           </button>
           <button title="새 메모 (Ctrl+N)" onClick={onNewNote}>
             + 메모
+          </button>
+          <button
+            title="팝업 모드 — 항상 위에 뜨는 작은 빠른 메모 (Ctrl+Alt+P)"
+            onClick={onTogglePopup}
+          >
+            팝업
           </button>
           <button title="도움말 · 단축키 (F1)" aria-label="도움말" onClick={onHelp}>
             ?

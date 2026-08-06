@@ -1664,3 +1664,75 @@ button {
   font-size: 13px;
   cursor: pointer;
 }
+
+/* ── 팝업 모드 ────────────────────────── */
+/* 항상 위에 뜨는 작은 빠른 메모 창. 창 테두리가 없어 상단 바를 끌어 옮긴다. */
+
+.popup-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid var(--border); /* 프레임이 없으므로 바탕화면과의 경계선 */
+}
+
+.popup-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 5px 5px 5px 10px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.popup-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.opacity-slider {
+  flex-shrink: 0;
+  width: 70px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.popup-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  font-size: 13px;
+  line-height: 1;
+  text-align: center;
+  color: var(--fg-dim);
+}
+
+.popup-btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+/* 팝업 모드 에디터: 헤더가 없어 저장 표시만 본문 위에 겹쳐 띄운다 */
+.editor.compact {
+  position: relative;
+}
+
+.save-state.floating {
+  position: absolute;
+  top: 4px;
+  right: 12px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.editor.compact .editor-body .ProseMirror {
+  padding: 10px 14px 30vh;
+}
