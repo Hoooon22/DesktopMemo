@@ -85,6 +85,7 @@ export default function Sidebar({
             + 메모
           </button>
           <button
+            className="popup-mode-btn"
             title="팝업 모드 — 항상 위에 뜨는 작은 빠른 메모 (Ctrl+Alt+P)"
             onClick={onTogglePopup}
           >

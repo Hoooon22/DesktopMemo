@@ -50,6 +50,14 @@ export default function PopupMemo({
         />
         <button
           className="popup-btn"
+          title="최소화"
+          aria-label="최소화"
+          onClick={() => void getCurrentWindow().minimize()}
+        >
+          —
+        </button>
+        <button
+          className="popup-btn"
           title="기본 모드로 돌아가기 (Ctrl+Alt+P)"
           aria-label="기본 모드로 돌아가기"
           onClick={onExit}

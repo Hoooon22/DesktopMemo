@@ -164,6 +164,20 @@ button {
   color: var(--fg);
 }
 
+/* 팝업 모드 버튼은 옆의 다른 버튼에 묻히지 않도록 강조한다 */
+.sidebar-actions .popup-mode-btn {
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sidebar-actions .popup-mode-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #10131a;
+}
+
 .pinned {
   display: flex;
   flex-direction: column;
