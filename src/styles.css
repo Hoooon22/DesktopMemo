@@ -10,6 +10,25 @@
   --border: #2a2e37;
   --bg-folder: #22252c; /* 트리 폴더 행 바탕 (패널과 hover 중간 톤) */
   --danger: #e06c75;
+  --on-accent: #10131a; /* 강조색 바탕 위의 글자색 */
+  --shadow-color: rgba(0, 0, 0, 0.5);
+}
+
+/* 라이트 테마 (사이드바 ☀/☾ 버튼으로 전환, html[data-theme]에 기록) */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-panel: #f4f5f7;
+  --bg-hover: #e8eaee;
+  --bg-active: #dee5f4;
+  --fg: #24272e;
+  --fg-dim: #6b7280;
+  --accent: #2f6feb;
+  --border: #d9dce2;
+  --bg-folder: #eceef2;
+  --danger: #d13b45;
+  --on-accent: #ffffff;
+  --shadow-color: rgba(15, 23, 42, 0.16);
 }
 
 * {
@@ -172,10 +191,17 @@ button {
   font-weight: 600;
 }
 
+/* 해·달 글리프는 글자보다 작아 보여 한 단계 키운다 */
+.sidebar-actions .theme-toggle {
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 6px;
+}
+
 .sidebar-actions .popup-mode-btn:hover {
   background: var(--accent);
   border-color: var(--accent);
-  color: #10131a;
+  color: var(--on-accent);
 }
 
 .pinned {
@@ -531,7 +557,7 @@ button {
   font-size: 24px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 16px var(--shadow-color);
   z-index: 10;
   transition: transform 0.1s ease, border-color 0.1s ease;
 }
@@ -646,6 +672,54 @@ button {
   margin: 1em 0;
 }
 
+/* 마크다운 표: 넓은 표는 본문을 밀어내지 않고 표 안에서만 가로 스크롤 */
+.editor-body .ProseMirror .tableWrapper {
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+
+.editor-body .ProseMirror table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  overflow: hidden;
+}
+
+.editor-body .ProseMirror th,
+.editor-body .ProseMirror td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+  min-width: 60px;
+  position: relative; /* 셀 선택 표시(::after) 기준 */
+}
+
+.editor-body .ProseMirror th {
+  background: var(--bg-panel);
+  font-weight: 600;
+}
+
+/* 행이 많아도 눈이 줄을 놓치지 않게 옅은 줄무늬 */
+.editor-body .ProseMirror tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+/* 셀 안 문단은 표 높이를 키우지 않도록 바깥 여백 제거 */
+.editor-body .ProseMirror th > p,
+.editor-body .ProseMirror td > p {
+  margin: 0;
+}
+
+/* 드래그로 선택한 셀 (ProseMirror table 확장) */
+.editor-body .ProseMirror .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  pointer-events: none;
+}
+
 /* ── 도움말 ───────────────────────────── */
 
 .help-modal {
@@ -659,7 +733,7 @@ button {
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 12px 40px var(--shadow-color);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1159,7 +1233,7 @@ button {
   border-radius: 8px;
   padding: 10px 16px;
   font-size: 13px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 16px var(--shadow-color);
   z-index: 20;
 }
 
@@ -1188,7 +1262,7 @@ button {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 4px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 6px 20px var(--shadow-color);
   display: flex;
   flex-direction: column;
 }
@@ -1227,7 +1301,7 @@ button {
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 12px 40px var(--shadow-color);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1600,7 +1674,7 @@ button {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 6px 20px var(--shadow-color);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1656,7 +1730,7 @@ button {
 
 .save-pop-actions button.primary {
   background: var(--accent);
-  color: #10131a;
+  color: var(--on-accent);
 }
 
 .save-pop-actions button.primary:disabled {

@@ -14,9 +14,11 @@ type Props = {
   renamingPath: string | null;
   favorites: string[];
   todos: Todo[];
+  theme: "dark" | "light";
   onToggleTodo: (id: string) => void;
   onReorderTodo: (dragged: string, target: string, before: boolean) => void;
   onQuickAddTodo: () => void;
+  onToggleTheme: () => void;
   onTogglePopup: () => void;
   onHelp: () => void;
   onSelectNote: (path: string) => void;
@@ -47,9 +49,11 @@ export default function Sidebar({
   renamingPath,
   favorites,
   todos,
+  theme,
   onToggleTodo,
   onReorderTodo,
   onQuickAddTodo,
+  onToggleTheme,
   onTogglePopup,
   onHelp,
   onSelectNote,
@@ -90,6 +94,14 @@ export default function Sidebar({
             onClick={onTogglePopup}
           >
             팝업
+          </button>
+          <button
+            className="theme-toggle"
+            title={theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"}
+            aria-label={theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"}
+            onClick={onToggleTheme}
+          >
+            {theme === "dark" ? "☀" : "☾"}
           </button>
           <button title="도움말 · 단축키 (F1)" aria-label="도움말" onClick={onHelp}>
             ?

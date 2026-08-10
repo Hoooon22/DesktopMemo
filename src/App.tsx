@@ -69,6 +69,7 @@ const TABS_KEY = "open-tabs";
 const ACTIVE_TAB_KEY = "active-tab";
 const POPUP_KEY = "popup-mode";
 const OPACITY_KEY = "popup-opacity";
+const THEME_KEY = "theme";
 // 두 모드의 창 크기·위치를 따로 기억해 전환할 때마다 각자 마지막 상태로 돌아간다
 const NORMAL_BOUNDS_KEY = "normal-bounds";
 const POPUP_BOUNDS_KEY = "popup-bounds";
@@ -150,6 +151,9 @@ export default function App() {
     return v >= 0.3 && v <= 1 ? v : 1;
   });
   const [hovering, setHovering] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">(() =>
+    localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark",
+  );
 
   const toastTimer = useRef<number | undefined>(undefined);
 
@@ -182,6 +186,12 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(TABS_KEY, JSON.stringify(tabs));
   }, [tabs]);
+
+  // 테마는 html[data-theme]로 내려 CSS 변수를 바꾼다 (index.html이 첫 페인트 전에 같은 값을 미리 적용)
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
 
   useEffect(() => {
     localStorage.setItem(ACTIVE_TAB_KEY, selected);
@@ -702,9 +712,11 @@ export default function App() {
         renamingPath={renamingPath}
         favorites={visibleFavorites}
         todos={todos}
+        theme={theme}
         onToggleTodo={toggleTodo}
         onReorderTodo={reorderTodo}
         onQuickAddTodo={() => setQuickAddOpen(true)}
+        onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
         onTogglePopup={() => setPopup(true)}
         onHelp={openHelp}
         onSelectNote={selectNote}

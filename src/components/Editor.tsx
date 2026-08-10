@@ -9,6 +9,10 @@ import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import Paragraph from "@tiptap/extension-paragraph";
 import Placeholder from "@tiptap/extension-placeholder";
+import Table from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableHeader from "@tiptap/extension-table-header";
+import TableCell from "@tiptap/extension-table-cell";
 import { Markdown } from "tiptap-markdown";
 import type { MarkdownSerializerState } from "@tiptap/pm/markdown";
 import type { Node as PMNode } from "@tiptap/pm/model";
@@ -149,6 +153,11 @@ export default function Editor({
       Link.configure({ openOnClick: false }),
       LocalImage,
       Placeholder.configure({ placeholder: "메모를 입력하세요…" }),
+      // 마크다운 표(| a | b |)를 실제 표로 그린다. 저장할 때는 tiptap-markdown이 다시 표 문법으로 직렬화.
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
       Markdown.configure({ html: false, transformPastedText: true }),
     ],
     editorProps: {
