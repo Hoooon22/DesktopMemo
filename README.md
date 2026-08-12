@@ -1,54 +1,120 @@
-# React + TypeScript + Vite
+# DesktopMemo
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+바탕화면 한쪽에 늘 띄워 두는 Windows 메모장. 생각날 때 아무 데나 적어 두고, 나중에 제자리로 옮깁니다.
 
-Currently, two official plugins are available:
+메모는 `문서\DesktopMemo` 폴더에 평범한 마크다운(`.md`) 파일로 저장됩니다. 앱을 지워도 메모는 그대로 남고, 다른 편집기로 열어 고쳐도 앱이 알아채고 화면을 다시 읽어옵니다.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 설치
 
-## Expanding the ESLint configuration
+[Releases](https://github.com/Hoooon22/DesktopMemo/releases/latest)에서 설치 파일을 받아 실행하세요. Windows 전용입니다.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+설치 후에는 트레이 아이콘 우클릭 → **업데이트 확인**으로 새 버전을 받을 수 있습니다.
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+## 이런 걸 합니다
+
+### 빠른 메모
+
+다른 프로그램을 쓰는 중에도 <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> 한 번이면 빠른 메모가 열립니다. 창이 트레이에 숨어 있어도 동작합니다.
+
+적어 둔 내용은 두 가지 방법으로 정리합니다.
+
+- **폴더로 저장** — 새 메모로 만들어 원하는 폴더에 넣습니다.
+- **이어서 붙이기** — 이미 있는 메모 끝에 구분선과 오늘 날짜를 넣고 그 아래에 덧붙입니다. 같은 메모에 기록을 쌓아 갈 때 씁니다. 본문에서 일부만 끌어 선택한 뒤 누르면 그 부분만 옮겨지고 나머지는 빠른 메모에 남습니다.
+
+### 메모 정리
+
+- 폴더 트리에서 드래그로 옮기고, 같은 폴더 안에서는 순서까지 바꿉니다 (수동 순서는 `.order.json`에 기억됩니다)
+- 여러 메모를 탭으로 열어 두고, 탭을 본문 좌우로 끌어 놓으면 화면이 둘로 나뉩니다
+- 자주 보는 메모는 즐겨찾기로 사이드바 위에 고정
+- 지운 메모는 Windows 휴지통으로 갑니다. 삭제 직후 뜨는 알림의 "실행 취소"로 바로 되돌릴 수 있습니다
+
+### 본문 편집
+
+노션처럼 서식이 바로 보이는 편집기지만, 저장되는 파일은 마크다운 그대로입니다.
+
+- `# `, `- `, `1. `, `> `, `---`를 입력하면 제목·목록·인용문·구분선으로 즉시 바뀝니다
+- 마크다운 표(`| a | b |`)를 실제 표로 그리고, 저장할 때 다시 표 문법으로 씁니다
+- 클립보드의 이미지를 붙여 넣으면 `.assets` 폴더에 저장하고 그 자리에 넣어 줍니다
+- 입력이 멈추면 0.5초 뒤 자동 저장. <kbd>Ctrl</kbd>+<kbd>S</kbd>로 즉시 저장
+- <kbd>Ctrl</kbd>+마우스휠로 글자 크기 조절
+
+### 찾기
+
+- <kbd>Ctrl</kbd>+<kbd>P</kbd> — 메모 이름을 입력해 바로 열기, 명령 실행
+- <kbd>Ctrl</kbd>+<kbd>F</kbd> — 제목뿐 아니라 본문 내용까지 검색
+
+### 할 일
+
+사이드바 아래 Todo 패널에 남은 할 일이 보입니다. <kbd>Ctrl</kbd>+<kbd>T</kbd>로 어디서든 추가하고, 패널의 제목을 누르면 완료 항목과 날짜까지 다루는 전체 화면이 열립니다.
+
+### 팝업 모드
+
+사이드바의 **팝업** 버튼(또는 <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>P</kbd>)을 누르면 빠른 메모만 보이는 작은 창이 항상 다른 창 위에 뜹니다. 슬라이더로 창 투명도를 조절할 수 있고, 마우스를 올리면 잠시 또렷해집니다. 팝업 창과 기본 창의 크기·위치는 각각 따로 기억됩니다.
+
+### 테마
+
+사이드바의 ☀/☾ 버튼으로 다크·라이트를 전환합니다. 라이트 테마는 오래 봐도 눈이 편하도록 순백 대신 따뜻한 오프화이트 바탕에 본문 대비를 약 11:1로 잡았습니다.
+
+## 메모가 저장되는 곳
+
+```
+문서\DesktopMemo\
+├─ QuickMemo.md        빠른 메모
+├─ 폴더\메모.md         일반 메모 (원하는 만큼 중첩)
+├─ .assets\            붙여 넣은 이미지
+├─ .todos.json         할 일
+├─ .favorites.json     즐겨찾기 (배열 순서 = 표시 순서)
+└─ .order.json         드래그로 바꾼 표시 순서
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+`.`으로 시작하는 파일은 앱 화면에 나오지 않습니다.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 단축키
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+전체 목록은 앱에서 <kbd>F1</kbd>을 누르면 볼 수 있습니다. 자주 쓰는 것만:
+
+| 키 | 하는 일 |
+| --- | --- |
+| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> | 빠른 메모 열기 (다른 프로그램에서도 동작) |
+| <kbd>Ctrl</kbd>+<kbd>P</kbd> | 빠른 이동 |
+| <kbd>Ctrl</kbd>+<kbd>F</kbd> | 검색 |
+| <kbd>Ctrl</kbd>+<kbd>N</kbd> | 새 메모 (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd>은 새 폴더) |
+| <kbd>Ctrl</kbd>+<kbd>T</kbd> | 할 일 빠른 추가 |
+| <kbd>Ctrl</kbd>+<kbd>W</kbd> | 탭 닫기 |
+| <kbd>F1</kbd> | 도움말 |
+
+창을 닫아도 프로그램은 종료되지 않고 트레이로 숨습니다. 완전히 끄려면 트레이 아이콘을 우클릭해 종료를 누르세요.
+
+## 개발
+
+[Tauri 2](https://tauri.app) + React 18 + TypeScript로 만들었습니다. 편집기는 [TipTap](https://tiptap.dev), 마크다운 직렬화는 `tiptap-markdown`을 씁니다.
+
+준비물은 Node 22와 Rust stable 툴체인, 그리고 Windows입니다.
+
+```bash
+npm install
+npm run tauri dev     # 개발 실행 (Vite + Tauri)
+npm run build         # 타입 검사 + 프런트 번들
+npm run lint
 ```
+
+```
+src/                  React 화면
+├─ App.tsx            전역 상태·단축키·탭·분할
+├─ api.ts             Tauri 커맨드 래퍼
+└─ components/        사이드바, 트리, 편집기, 검색, 할 일 …
+src-tauri/src/
+├─ lib.rs             트레이, 전역 단축키, 창 관리, 파일 워처
+└─ notes.rs           메모 파일 읽기·쓰기·이동·검색
+```
+
+## 릴리즈
+
+`src-tauri/tauri.conf.json`의 `version`을 올려 커밋한 뒤 태그를 밀면, GitHub Actions가 빌드·서명하고 릴리즈를 만듭니다.
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+설치본은 릴리즈의 `latest.json`을 보고 스스로 새 버전을 찾습니다.
