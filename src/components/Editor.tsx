@@ -161,6 +161,8 @@ export default function Editor({
   const [appendPop, setAppendPop] = useState(false);
   const [appendEntries, setAppendEntries] = useState<TreeOpt[]>([]);
   const [appendPath, setAppendPath] = useState("");
+  // 버튼을 누른 순간 본문에서 끌어 놓은 범위. null이면 빠른 메모 전체를 옮긴다.
+  const [appendSel, setAppendSel] = useState<{ from: number; to: number } | null>(null);
   const [fontSize, setFontSize] = useState(() => {
     const v = Number(localStorage.getItem(FONT_KEY));
     return v >= FONT_MIN && v <= FONT_MAX ? v : FONT_DEFAULT;
@@ -366,8 +368,12 @@ export default function Editor({
     }
   };
 
-  // "이어서 붙이기" 팝오버 열기 (붙일 대상은 메모라서 폴더까지 함께 보여 준다)
+  // "이어서 붙이기" 팝오버 열기 (붙일 대상은 메모라서 폴더까지 함께 보여 준다).
+  // 버튼을 누르면 편집기에서 포커스가 빠지지만 ProseMirror는 선택 범위를 그대로
+  // 들고 있어서, 이때 읽어 두면 끌어 놓은 부분만 옮길 수 있다.
   const openAppendPop = async () => {
+    const sel = editor?.state.selection;
+    setAppendSel(sel && !sel.empty ? { from: sel.from, to: sel.to } : null);
     setAppendPath("");
     setSaveErr(null);
     setSavePop(false);
@@ -410,15 +416,29 @@ export default function Editor({
 
   const confirmAppend = async () => {
     if (!appendPath) return;
-    const body = contentRef.current.trim();
+    // 선택 범위가 있으면 그 부분만 떼어 옮기고 나머지는 빠른 메모에 남긴다.
+    // 아직 편집기를 건드리지 않고 결과 문서만 미리 만들어 두었다가,
+    // 파일 기록이 성공한 뒤에 화면에도 반영한다.
+    const md = editor?.storage.markdown.serializer;
+    const sel = editor && md && appendSel ? appendSel : null;
+    const body = sel
+      ? md!.serialize(editor!.state.doc.cut(sel.from, sel.to)).trim()
+      : contentRef.current.trim();
+    const rest = sel ? md!.serialize(editor!.state.tr.delete(sel.from, sel.to).doc) : "";
     if (!body) {
-      setSaveErr("빠른 메모가 비어 있습니다");
+      setSaveErr(sel ? "선택한 부분이 비어 있습니다" : "빠른 메모가 비어 있습니다");
       return;
     }
     dropPendingSave();
     try {
-      await appendQuickMemo(appendPath, `---\n\n${todayStr()}\n\n${body}`);
-      clearQuickMemo();
+      await appendQuickMemo(appendPath, `---\n\n${todayStr()}\n\n${body}`, rest);
+      if (sel) {
+        // deleteRange가 onUpdate를 태워 contentRef와 자동 저장을 알아서 맞춘다
+        editor!.commands.deleteRange(sel);
+        setSaveState("saved");
+      } else {
+        clearQuickMemo();
+      }
       setAppendPop(false);
     } catch (e) {
       setSaveErr(String(e));
@@ -554,7 +574,7 @@ export default function Editor({
           <div className="ctx-backdrop" onClick={() => setAppendPop(false)} />
           <div className="save-pop">
             <label>
-              이어 붙일 메모
+              {appendSel ? "이어 붙일 메모 (선택한 부분만)" : "이어 붙일 메모"}
               <select
                 value={appendPath}
                 autoFocus

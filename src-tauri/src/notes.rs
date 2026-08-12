@@ -371,13 +371,17 @@ pub fn save_quick_memo(
     Ok(rel)
 }
 
-/// 빠른 메모 내용을 이미 있는 메모 끝에 이어 붙이고, 빠른 메모를 비운다.
-/// block은 프런트가 구분선·날짜까지 붙여 만든 마크다운 조각이다.
+/// 빠른 메모 내용을 이미 있는 메모 끝에 이어 붙인다.
+/// block은 프런트가 구분선·날짜까지 붙여 만든 마크다운 조각이고,
+/// rest는 붙이고 난 뒤 빠른 메모에 남길 내용이다 (전체를 옮겼으면 빈 문자열,
+/// 선택한 부분만 옮겼으면 나머지). 파일이 잠깐 비었다가 다시 차는 일이 없도록
+/// 한 번에 기록한다.
 #[tauri::command]
 pub fn append_quick_memo(
     root: State<NotesRoot>,
     path: String,
     block: String,
+    rest: String,
 ) -> Result<(), String> {
     ensure_not_quick_memo(&path)?;
     let dest = resolve(&root.0, &path)?;
@@ -394,7 +398,7 @@ pub fn append_quick_memo(
         format!("{old}\n\n{}\n", block.trim())
     };
     fs::write(&dest, text).map_err(|e| e.to_string())?;
-    fs::write(root.0.join(QUICK_MEMO), "").map_err(|e| e.to_string())?;
+    fs::write(root.0.join(QUICK_MEMO), rest).map_err(|e| e.to_string())?;
     Ok(())
 }
 

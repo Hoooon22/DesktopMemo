@@ -31,9 +31,9 @@ export const searchNotes = (query: string) => invoke<SearchHit[]>("search_notes"
 export const saveQuickMemo = (dir: string, name: string, content: string) =>
   invoke<string>("save_quick_memo", { dir, name, content });
 
-// 빠른 메모 내용을 기존 메모 끝에 이어 붙이고 빠른 메모를 비운다
-export const appendQuickMemo = (path: string, block: string) =>
-  invoke<void>("append_quick_memo", { path, block });
+// 빠른 메모 내용을 기존 메모 끝에 이어 붙이고, 빠른 메모에는 rest만 남긴다
+export const appendQuickMemo = (path: string, block: string, rest: string) =>
+  invoke<void>("append_quick_memo", { path, block, rest });
 
 // 붙여넣은 이미지를 .assets 폴더에 저장하고 상대 경로를 돌려받는다
 export const saveImage = (data: number[], ext: string) =>
