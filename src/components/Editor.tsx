@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { documentDir, join } from "@tauri-apps/api/path";
-import { mergeAttributes } from "@tiptap/core";
+import { Extension, mergeAttributes } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
@@ -16,8 +16,17 @@ import TableCell from "@tiptap/extension-table-cell";
 import { Markdown } from "tiptap-markdown";
 import type { MarkdownSerializerState } from "@tiptap/pm/markdown";
 import type { Node as PMNode } from "@tiptap/pm/model";
-import { listTree, QUICK_MEMO, readNote, saveImage, saveQuickMemo, writeNote } from "../api";
+import {
+  appendQuickMemo,
+  listTree,
+  QUICK_MEMO,
+  readNote,
+  saveImage,
+  saveQuickMemo,
+  writeNote,
+} from "../api";
 import type { TreeNode } from "../api";
+import { todayStr } from "../useTodos";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -54,6 +63,26 @@ const KeepEmptyLineParagraph = Paragraph.extend({
             }
           },
         },
+      },
+    };
+  },
+});
+
+// 목록·표 밖의 일반 문단에서도 Tab으로 들여쓸 수 있게 한다.
+// 진짜 탭 문자는 줄 앞에 오면 마크다운이 코드 블록으로 읽어 버리므로,
+// 다시 열어도 그대로 남는 줄바꿈 없는 공백(NBSP)을 넣는다.
+// priority를 낮춰 목록 들여쓰기·표 셀 이동 같은 기존 Tab 동작이 먼저 처리되게 한다.
+const TAB_INDENT = "\u00A0".repeat(4);
+
+const TabIndent = Extension.create({
+  name: "tabIndent",
+  priority: 50,
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => {
+        // 코드 블록 안은 마크다운이 펜스로 감싸 그대로 보존하므로 진짜 탭을 넣는다
+        if (this.editor.isActive("codeBlock")) return this.editor.commands.insertContent("\t");
+        return this.editor.commands.insertContent(TAB_INDENT);
       },
     };
   },
@@ -103,14 +132,13 @@ type Props = {
   compact?: boolean; // 팝업 모드: 헤더 없이 본문만 (저장 표시는 본문 위 작은 라벨)
 };
 
-type FolderOpt = { path: string; name: string; depth: number };
+type TreeOpt = { path: string; name: string; depth: number; isDir: boolean };
 
-function flattenFolders(nodes: TreeNode[], depth = 0, out: FolderOpt[] = []): FolderOpt[] {
+// 트리를 화면 순서 그대로 한 줄씩 펼친다 (폴더 선택은 isDir만 걸러 쓴다)
+function flattenTree(nodes: TreeNode[], depth = 0, out: TreeOpt[] = []): TreeOpt[] {
   for (const n of nodes) {
-    if (n.isDir) {
-      out.push({ path: n.path, name: n.name, depth });
-      if (n.children) flattenFolders(n.children, depth + 1, out);
-    }
+    out.push({ path: n.path, name: n.name, depth, isDir: n.isDir });
+    if (n.children) flattenTree(n.children, depth + 1, out);
   }
   return out;
 }
@@ -126,10 +154,13 @@ export default function Editor({
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [titleDraft, setTitleDraft] = useState("");
   const [savePop, setSavePop] = useState(false);
-  const [saveFolders, setSaveFolders] = useState<FolderOpt[]>([]);
+  const [saveFolders, setSaveFolders] = useState<TreeOpt[]>([]);
   const [saveDir, setSaveDir] = useState("");
   const [saveName, setSaveName] = useState("");
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [appendPop, setAppendPop] = useState(false);
+  const [appendEntries, setAppendEntries] = useState<TreeOpt[]>([]);
+  const [appendPath, setAppendPath] = useState("");
   const [fontSize, setFontSize] = useState(() => {
     const v = Number(localStorage.getItem(FONT_KEY));
     return v >= FONT_MIN && v <= FONT_MAX ? v : FONT_DEFAULT;
@@ -159,6 +190,7 @@ export default function Editor({
       TableHeader,
       TableCell,
       Markdown.configure({ html: false, transformPastedText: true }),
+      TabIndent,
     ],
     editorProps: {
       attributes: { spellcheck: "false" }, // 오타 빨간 밑줄 비활성화
@@ -325,30 +357,69 @@ export default function Editor({
     setSaveDir("");
     setSaveName("");
     setSaveErr(null);
+    setAppendPop(false);
     setSavePop(true);
     try {
-      setSaveFolders(flattenFolders(await listTree()));
+      setSaveFolders(flattenTree(await listTree()).filter((n) => n.isDir));
     } catch (e) {
       setSaveErr(String(e));
     }
   };
 
-  const confirmSaveToFolder = async () => {
-    const name = saveName.trim();
-    if (!name) return;
-    // 대기 중인 자동 저장을 취소한다 — 저장이 끝나면 빠른 메모는 비워지므로,
-    // 그 뒤에 옛 내용이 QuickMemo.md에 다시 쓰이면 안 된다
+  // "이어서 붙이기" 팝오버 열기 (붙일 대상은 메모라서 폴더까지 함께 보여 준다)
+  const openAppendPop = async () => {
+    setAppendPath("");
+    setSaveErr(null);
+    setSavePop(false);
+    setAppendPop(true);
+    try {
+      setAppendEntries(flattenTree(await listTree()));
+    } catch (e) {
+      setSaveErr(String(e));
+    }
+  };
+
+  // 옮기기가 끝나면 QuickMemo.md는 비워지므로, 그 뒤에 옛 내용이 다시 쓰이지 않도록
+  // 대기 중인 자동 저장을 버린다
+  const dropPendingSave = () => {
     if (timer.current !== undefined) {
       window.clearTimeout(timer.current);
       timer.current = undefined;
     }
     pending.current = null;
+  };
+
+  const clearQuickMemo = () => {
+    contentRef.current = "";
+    editor?.commands.setContent("", false);
+    setSaveState("saved");
+  };
+
+  const confirmSaveToFolder = async () => {
+    const name = saveName.trim();
+    if (!name) return;
+    dropPendingSave();
     try {
       await saveQuickMemo(saveDir, name, contentRef.current);
-      contentRef.current = "";
-      editor?.commands.setContent("", false);
+      clearQuickMemo();
       setSavePop(false);
-      setSaveState("saved");
+    } catch (e) {
+      setSaveErr(String(e));
+    }
+  };
+
+  const confirmAppend = async () => {
+    if (!appendPath) return;
+    const body = contentRef.current.trim();
+    if (!body) {
+      setSaveErr("빠른 메모가 비어 있습니다");
+      return;
+    }
+    dropPendingSave();
+    try {
+      await appendQuickMemo(appendPath, `---\n\n${todayStr()}\n\n${body}`);
+      clearQuickMemo();
+      setAppendPop(false);
     } catch (e) {
       setSaveErr(String(e));
     }
@@ -406,13 +477,22 @@ export default function Editor({
           )}
           <span className="save-state">{SAVE_LABEL[saveState]}</span>
           {isQuickMemo && (
-            <button
-              className="save-to-folder-btn"
-              title="빠른 메모를 폴더에 새 메모로 저장"
-              onClick={() => void openSavePop()}
-            >
-              폴더로 저장
-            </button>
+            <>
+              <button
+                className="save-to-folder-btn"
+                title="빠른 메모를 기존 메모 끝에 구분선·날짜와 함께 이어 붙이기"
+                onClick={() => void openAppendPop()}
+              >
+                이어서 붙이기
+              </button>
+              <button
+                className="save-to-folder-btn"
+                title="빠른 메모를 폴더에 새 메모로 저장"
+                onClick={() => void openSavePop()}
+              >
+                폴더로 저장
+              </button>
+            </>
           )}
           {onClose && (
             <button
@@ -464,6 +544,39 @@ export default function Editor({
                 onClick={() => void confirmSaveToFolder()}
               >
                 저장
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+      {isQuickMemo && appendPop && (
+        <>
+          <div className="ctx-backdrop" onClick={() => setAppendPop(false)} />
+          <div className="save-pop">
+            <label>
+              이어 붙일 메모
+              <select
+                value={appendPath}
+                autoFocus
+                onChange={(e) => setAppendPath(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void confirmAppend();
+                  else if (e.key === "Escape") setAppendPop(false);
+                }}
+              >
+                <option value="">메모 선택</option>
+                {appendEntries.map((n) => (
+                  <option key={n.path} value={n.isDir ? "" : n.path} disabled={n.isDir}>
+                    {"  ".repeat(n.depth) + (n.isDir ? `${n.name}/` : n.name.replace(/\.md$/i, ""))}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {saveErr && <div className="save-pop-error">{saveErr}</div>}
+            <div className="save-pop-actions">
+              <button onClick={() => setAppendPop(false)}>취소</button>
+              <button className="primary" disabled={!appendPath} onClick={() => void confirmAppend()}>
+                붙이기
               </button>
             </div>
           </div>

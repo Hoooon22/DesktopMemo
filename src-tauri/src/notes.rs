@@ -371,6 +371,33 @@ pub fn save_quick_memo(
     Ok(rel)
 }
 
+/// 빠른 메모 내용을 이미 있는 메모 끝에 이어 붙이고, 빠른 메모를 비운다.
+/// block은 프런트가 구분선·날짜까지 붙여 만든 마크다운 조각이다.
+#[tauri::command]
+pub fn append_quick_memo(
+    root: State<NotesRoot>,
+    path: String,
+    block: String,
+) -> Result<(), String> {
+    ensure_not_quick_memo(&path)?;
+    let dest = resolve(&root.0, &path)?;
+    if !dest.is_file() {
+        return Err(format!("메모가 존재하지 않습니다: {path}"));
+    }
+    let old = fs::read_to_string(&dest).map_err(|e| e.to_string())?;
+    // 원래 내용과 새 조각 사이는 빈 줄 하나로 띄운다 (구분선이 앞 문단에 붙어
+    // setext 제목으로 해석되는 걸 막는다). 빈 파일이면 앞 여백 없이 시작.
+    let old = old.trim_end();
+    let text = if old.is_empty() {
+        format!("{}\n", block.trim())
+    } else {
+        format!("{old}\n\n{}\n", block.trim())
+    };
+    fs::write(&dest, text).map_err(|e| e.to_string())?;
+    fs::write(root.0.join(QUICK_MEMO), "").map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 pub fn create_note(root: State<NotesRoot>, dir: String) -> Result<String, String> {
     let parent = resolve(&root.0, &dir)?;
