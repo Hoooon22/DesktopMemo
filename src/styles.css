@@ -1713,6 +1713,11 @@ button {
   border-color: var(--accent);
 }
 
+.save-pop-hint {
+  font-size: 12px;
+  color: var(--accent);
+}
+
 .save-pop-error {
   font-size: 12px;
   color: var(--danger);

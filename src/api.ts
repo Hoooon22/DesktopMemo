@@ -27,9 +27,9 @@ export const restoreEntry = (path: string) => invoke<void>("restore_entry", { pa
 export type SearchHit = { path: string; name: string; snippet: string };
 export const searchNotes = (query: string) => invoke<SearchHit[]>("search_notes", { query });
 
-// 빠른 메모 내용을 지정 폴더에 새 메모로 저장하고 빠른 메모를 비운다
-export const saveQuickMemo = (dir: string, name: string, content: string) =>
-  invoke<string>("save_quick_memo", { dir, name, content });
+// 빠른 메모 내용을 지정 폴더에 새 메모로 저장하고, 빠른 메모에는 rest만 남긴다
+export const saveQuickMemo = (dir: string, name: string, content: string, rest: string) =>
+  invoke<string>("save_quick_memo", { dir, name, content, rest });
 
 // 빠른 메모 내용을 기존 메모 끝에 이어 붙이고, 빠른 메모에는 rest만 남긴다
 export const appendQuickMemo = (path: string, block: string, rest: string) =>

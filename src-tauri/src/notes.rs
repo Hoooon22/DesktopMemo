@@ -342,15 +342,18 @@ fn validate_note_name(name: &str) -> Result<String, String> {
     Ok(name)
 }
 
-/// 빠른 메모 내용을 지정한 폴더에 새 메모로 저장하고, 빠른 메모를 비운다.
+/// 빠른 메모 내용을 지정한 폴더에 새 메모로 저장한다.
 /// 내용은 디스크의 QuickMemo.md 대신 프런트가 들고 있는 최신본을 받는다
 /// (자동 저장 디바운스로 디스크가 뒤처져 있을 수 있음).
+/// rest는 저장하고 난 뒤 빠른 메모에 남길 내용이다 (전체를 옮겼으면 빈 문자열,
+/// 선택한 부분만 옮겼으면 나머지).
 #[tauri::command]
 pub fn save_quick_memo(
     root: State<NotesRoot>,
     dir: String,
     name: String,
     content: String,
+    rest: String,
 ) -> Result<String, String> {
     let parent = resolve(&root.0, &dir)?;
     if !parent.is_dir() {
@@ -367,7 +370,7 @@ pub fn save_quick_memo(
         return Err("이미 같은 이름이 있습니다".into());
     }
     fs::write(&dest, &content).map_err(|e| e.to_string())?;
-    fs::write(root.0.join(QUICK_MEMO), "").map_err(|e| e.to_string())?;
+    fs::write(root.0.join(QUICK_MEMO), rest).map_err(|e| e.to_string())?;
     Ok(rel)
 }
 

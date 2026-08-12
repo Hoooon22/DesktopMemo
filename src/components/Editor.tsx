@@ -162,7 +162,7 @@ export default function Editor({
   const [appendEntries, setAppendEntries] = useState<TreeOpt[]>([]);
   const [appendPath, setAppendPath] = useState("");
   // 버튼을 누른 순간 본문에서 끌어 놓은 범위. null이면 빠른 메모 전체를 옮긴다.
-  const [appendSel, setAppendSel] = useState<{ from: number; to: number } | null>(null);
+  const [moveSel, setMoveSel] = useState<{ from: number; to: number } | null>(null);
   const [fontSize, setFontSize] = useState(() => {
     const v = Number(localStorage.getItem(FONT_KEY));
     return v >= FONT_MIN && v <= FONT_MAX ? v : FONT_DEFAULT;
@@ -354,8 +354,16 @@ export default function Editor({
     setTitleDraft(title);
   }, [title]);
 
+  // 버튼을 누르면 편집기에서 포커스가 빠지지만 ProseMirror는 선택 범위를 그대로
+  // 들고 있어서, 팝오버를 열 때 읽어 두면 끌어 놓은 부분만 옮길 수 있다.
+  const captureSelection = () => {
+    const sel = editor?.state.selection;
+    setMoveSel(sel && !sel.empty ? { from: sel.from, to: sel.to } : null);
+  };
+
   // "폴더로 저장" 팝오버 열기 (폴더 목록은 열 때마다 새로 읽는다)
   const openSavePop = async () => {
+    captureSelection();
     setSaveDir("");
     setSaveName("");
     setSaveErr(null);
@@ -368,12 +376,9 @@ export default function Editor({
     }
   };
 
-  // "이어서 붙이기" 팝오버 열기 (붙일 대상은 메모라서 폴더까지 함께 보여 준다).
-  // 버튼을 누르면 편집기에서 포커스가 빠지지만 ProseMirror는 선택 범위를 그대로
-  // 들고 있어서, 이때 읽어 두면 끌어 놓은 부분만 옮길 수 있다.
+  // "이어서 붙이기" 팝오버 열기 (붙일 대상은 메모라서 폴더까지 함께 보여 준다)
   const openAppendPop = async () => {
-    const sel = editor?.state.selection;
-    setAppendSel(sel && !sel.empty ? { from: sel.from, to: sel.to } : null);
+    captureSelection();
     setAppendPath("");
     setSaveErr(null);
     setSavePop(false);
@@ -395,19 +400,49 @@ export default function Editor({
     pending.current = null;
   };
 
-  const clearQuickMemo = () => {
-    contentRef.current = "";
-    editor?.commands.setContent("", false);
-    setSaveState("saved");
+  // 옮길 조각과 빠른 메모에 남길 내용을 만든다. 선택 범위가 있으면 그 부분만
+  // 떼어 내고 나머지를 남긴다. 아직 편집기는 건드리지 않고 결과 문서만 계산해
+  // 두었다가, 파일 기록이 성공한 뒤에 finishMove로 화면에 반영한다.
+  const sliceForMove = () => {
+    const md = editor?.storage.markdown.serializer;
+    if (!editor || !md || !moveSel) {
+      return { sel: null, body: contentRef.current.trim(), rest: "" };
+    }
+    const { from, to } = moveSel;
+    return {
+      sel: moveSel,
+      body: md.serialize(editor.state.doc.cut(from, to)).trim(),
+      rest: md.serialize(editor.state.tr.delete(from, to).doc),
+    };
   };
+
+  const finishMove = (sel: { from: number; to: number } | null) => {
+    if (sel) {
+      // deleteRange가 onUpdate를 태워 contentRef와 자동 저장을 알아서 맞춘다
+      editor?.commands.deleteRange(sel);
+      setSaveState("saved");
+    } else {
+      contentRef.current = "";
+      editor?.commands.setContent("", false);
+      setSaveState("saved");
+    }
+  };
+
+  const emptyMoveError = (sel: unknown) =>
+    sel ? "선택한 부분이 비어 있습니다" : "빠른 메모가 비어 있습니다";
 
   const confirmSaveToFolder = async () => {
     const name = saveName.trim();
     if (!name) return;
+    const { sel, body, rest } = sliceForMove();
+    if (!body) {
+      setSaveErr(emptyMoveError(sel));
+      return;
+    }
     dropPendingSave();
     try {
-      await saveQuickMemo(saveDir, name, contentRef.current);
-      clearQuickMemo();
+      await saveQuickMemo(saveDir, name, body, rest);
+      finishMove(sel);
       setSavePop(false);
     } catch (e) {
       setSaveErr(String(e));
@@ -416,29 +451,15 @@ export default function Editor({
 
   const confirmAppend = async () => {
     if (!appendPath) return;
-    // 선택 범위가 있으면 그 부분만 떼어 옮기고 나머지는 빠른 메모에 남긴다.
-    // 아직 편집기를 건드리지 않고 결과 문서만 미리 만들어 두었다가,
-    // 파일 기록이 성공한 뒤에 화면에도 반영한다.
-    const md = editor?.storage.markdown.serializer;
-    const sel = editor && md && appendSel ? appendSel : null;
-    const body = sel
-      ? md!.serialize(editor!.state.doc.cut(sel.from, sel.to)).trim()
-      : contentRef.current.trim();
-    const rest = sel ? md!.serialize(editor!.state.tr.delete(sel.from, sel.to).doc) : "";
+    const { sel, body, rest } = sliceForMove();
     if (!body) {
-      setSaveErr(sel ? "선택한 부분이 비어 있습니다" : "빠른 메모가 비어 있습니다");
+      setSaveErr(emptyMoveError(sel));
       return;
     }
     dropPendingSave();
     try {
       await appendQuickMemo(appendPath, `---\n\n${todayStr()}\n\n${body}`, rest);
-      if (sel) {
-        // deleteRange가 onUpdate를 태워 contentRef와 자동 저장을 알아서 맞춘다
-        editor!.commands.deleteRange(sel);
-        setSaveState("saved");
-      } else {
-        clearQuickMemo();
-      }
+      finishMove(sel);
       setAppendPop(false);
     } catch (e) {
       setSaveErr(String(e));
@@ -530,6 +551,7 @@ export default function Editor({
         <>
           <div className="ctx-backdrop" onClick={() => setSavePop(false)} />
           <div className="save-pop">
+            {moveSel && <div className="save-pop-hint">끌어 놓은 부분만 옮깁니다</div>}
             <label>
               폴더
               <select value={saveDir} onChange={(e) => setSaveDir(e.target.value)}>
@@ -573,8 +595,9 @@ export default function Editor({
         <>
           <div className="ctx-backdrop" onClick={() => setAppendPop(false)} />
           <div className="save-pop">
+            {moveSel && <div className="save-pop-hint">끌어 놓은 부분만 옮깁니다</div>}
             <label>
-              {appendSel ? "이어 붙일 메모 (선택한 부분만)" : "이어 붙일 메모"}
+              이어 붙일 메모
               <select
                 value={appendPath}
                 autoFocus
