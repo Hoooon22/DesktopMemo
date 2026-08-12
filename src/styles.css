@@ -12,23 +12,31 @@
   --danger: #e06c75;
   --on-accent: #10131a; /* 강조색 바탕 위의 글자색 */
   --shadow-color: rgba(0, 0, 0, 0.5);
+  --backdrop: rgba(0, 0, 0, 0.35); /* 모달 뒤를 덮는 막 */
 }
 
-/* 라이트 테마 (사이드바 ☀/☾ 버튼으로 전환, html[data-theme]에 기록) */
+/* 라이트 테마 (사이드바 ☀/☾ 버튼으로 전환, html[data-theme]에 기록)
+   장시간 봐도 눈이 편하도록 잡은 값들이다.
+   - 바탕: 순백(#fff)은 휘도가 최대라 눈부심·피로를 만든다. 종이에 가까운
+     따뜻한 오프화이트를 쓰고, 파랑을 살짝 덜어 빛의 날을 죽인다.
+   - 글자: 순흑 대비(21:1)는 글자 주변이 번지는 헤일레이션을 만든다.
+     따뜻한 진회색으로 본문 대비를 약 11:1(AAA)로 맞춘다.
+   - 보조색: 오프화이트 위에서도 4.5:1 이상 나오도록 다크 테마보다 어둡게 잡는다. */
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #ffffff;
-  --bg-panel: #f4f5f7;
-  --bg-hover: #e8eaee;
-  --bg-active: #dee5f4;
-  --fg: #24272e;
-  --fg-dim: #6b7280;
-  --accent: #2f6feb;
-  --border: #d9dce2;
-  --bg-folder: #eceef2;
-  --danger: #d13b45;
+  --bg: #faf9f6;
+  --bg-panel: #f1efe9;
+  --bg-hover: #e8e5dd;
+  --bg-active: #dfe5f1; /* 선택 행만 차가운 쪽으로 틀어 따뜻한 바탕과 구분 */
+  --fg: #37352f;
+  --fg-dim: #6b6a63;
+  --accent: #2b62c4;
+  --border: #ded9ce;
+  --bg-folder: #ebe8e1;
+  --danger: #b3382f;
   --on-accent: #ffffff;
-  --shadow-color: rgba(15, 23, 42, 0.16);
+  --shadow-color: rgba(64, 57, 42, 0.18);
+  --backdrop: rgba(60, 55, 44, 0.2);
 }
 
 * {
@@ -73,14 +81,14 @@ button {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(138, 143, 156, 0.28); /* --fg-dim 반투명 */
+  background: color-mix(in srgb, var(--fg-dim) 28%, transparent);
   border-radius: 8px;
   border: 3px solid transparent; /* 트랙과의 여백처럼 보이는 투명 테두리 */
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(138, 143, 156, 0.5);
+  background: color-mix(in srgb, var(--fg-dim) 50%, transparent);
   background-clip: padding-box;
 }
 
@@ -529,7 +537,7 @@ button {
 }
 
 .tree.drop-over {
-  background: rgba(122, 162, 247, 0.05);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
 }
 
 .rename-input {
@@ -564,7 +572,7 @@ button {
 
 .trash-target.over {
   border-color: var(--danger);
-  background: rgba(224, 108, 117, 0.18);
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
   transform: scale(1.12);
 }
 
@@ -1286,7 +1294,7 @@ button {
 .palette-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--backdrop);
   z-index: 40;
 }
 
