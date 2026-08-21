@@ -119,6 +119,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(
             // 창 크기·위치 기억 (표시 여부는 복원하지 않음 — 시작 시 항상 보이게)
             tauri_plugin_window_state::Builder::default()

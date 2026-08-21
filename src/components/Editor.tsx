@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { documentDir, join } from "@tauri-apps/api/path";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Extension, mergeAttributes } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -196,13 +197,40 @@ export default function Editor({
     ],
     editorProps: {
       attributes: { spellcheck: "false" }, // 오타 빨간 밑줄 비활성화
+      // Ctrl(맥은 Cmd) + 클릭으로 링크를 기본 브라우저에서 연다
+      handleDOMEvents: {
+        click: (_view, event) => {
+          if (!event.ctrlKey && !event.metaKey) return false;
+          const href = (event.target as HTMLElement | null)
+            ?.closest("a")
+            ?.getAttribute("href");
+          if (!href) return false;
+          event.preventDefault();
+          void openUrl(href).catch(() => {});
+          return true;
+        },
+      },
       // 클립보드 이미지 붙여넣기: 파일로 저장하고 그 자리에 이미지 노드 삽입
       handlePaste: (view, event) => {
         const item = Array.from(event.clipboardData?.items ?? []).find((i) =>
           i.type.startsWith("image/"),
         );
         const file = item?.getAsFile();
-        if (!file) return false;
+        if (!file) {
+          // URL만 붙여넣으면 바로 링크로 만든다(선택 영역이 있을 때는 Link 확장이 처리).
+          const text = event.clipboardData?.getData("text/plain")?.trim() ?? "";
+          if (!view.state.selection.empty || !/^https?:\/\/\S+$/.test(text)) return false;
+          event.preventDefault();
+          const { schema, tr } = view.state;
+          const link = schema.text(text, [schema.marks.link.create({ href: text })]);
+          view.dispatch(
+            tr
+              .replaceSelectionWith(link, false)
+              .removeStoredMark(schema.marks.link)
+              .setMeta("preventAutolink", true),
+          );
+          return true;
+        }
         event.preventDefault();
         void (async () => {
           try {
