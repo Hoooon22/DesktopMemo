@@ -79,12 +79,17 @@ const TabIndent = Extension.create({
   name: "tabIndent",
   priority: 50,
   addKeyboardShortcuts() {
+    // insertContent는 tiptap-markdown이 가로채 HTML로 바꾸는데,
+    // 순수 텍스트를 넣을 때 TipTap이 그 HTML 문자열을 그대로 써서 NBSP가 "&nbsp;" 글자로 박힌다.
+    // 트랜잭션으로 문자를 있는 그대로 넣는다.
+    const insert = (text: string) =>
+      this.editor.commands.command(({ tr, dispatch }) => {
+        if (dispatch) tr.insertText(text);
+        return true;
+      });
     return {
-      Tab: () => {
-        // 코드 블록 안은 마크다운이 펜스로 감싸 그대로 보존하므로 진짜 탭을 넣는다
-        if (this.editor.isActive("codeBlock")) return this.editor.commands.insertContent("\t");
-        return this.editor.commands.insertContent(TAB_INDENT);
-      },
+      // 코드 블록 안은 마크다운이 펜스로 감싸 그대로 보존하므로 진짜 탭을 넣는다
+      Tab: () => insert(this.editor.isActive("codeBlock") ? "\t" : TAB_INDENT),
     };
   },
 });
